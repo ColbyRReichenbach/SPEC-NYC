@@ -1,0 +1,13 @@
+# S.P.E.C. NYC Project State
+# This file is the minimal state pointer. The real source of truth is NYC_IMPLEMENTATION_PLAN.md checkboxes.
+
+current_phase: "1.2"
+phase_name: "Infrastructure Setup"
+status: "not_started"  # not_started | in_progress | complete
+last_updated: "2026-01-16"
+
+# Only add blocking issues here if work cannot proceed
+blocking: null
+
+# Recent milestone (optional, for quick reference)
+last_milestone: "Project scaffold created"

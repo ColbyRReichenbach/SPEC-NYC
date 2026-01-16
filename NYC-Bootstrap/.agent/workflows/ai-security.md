@@ -395,16 +395,13 @@ def test_budget_exceeded():
 
 ---
 
-## Handoff
+## When Done
 
-When AI security is implemented:
-
-1. Update `context.md`:
-   - Add "AI Security Layer complete" to Recent Changes
-
-2. Create audit log table:
+1. **Check off completed items** in `docs/NYC_IMPLEMENTATION_PLAN.md`
+2. **Update state** if changing phase: `.agent/workflows/state.yaml`
+3. **Create audit log table**:
    ```bash
    docker-compose exec db psql -U spec_user -d spec_nyc -f sql/create_audit_log.sql
    ```
-
-3. Route to: `/project-lead` when ready for V4.0 integration
+4. **Commit**: `git commit -am "Complete AI security layer"`
+5. **Handoff**: Route to `/project-lead` for V4.0 integration

@@ -265,17 +265,13 @@ pytest tests/test_security.py -v
 
 ---
 
-## Handoff
+## When Done
 
-After validation:
+1. **If all checks pass**: 
+   - Check off items in `docs/NYC_IMPLEMENTATION_PLAN.md`
+   - Route to `/project-lead` for next phase
 
-1. If all checks pass:
-   - Update `context.md` with validation timestamp
-   - Proceed to next phase
-
-2. If checks fail:
-   - Document failures in `context.md` Blocking Issues
+2. **If checks fail**:
+   - Update `state.yaml` with `blocking: "description of issue"`
    - Route to appropriate workflow for fixes
    - Re-run validation after fixes
-
-3. Route to: `/project-lead` with validation report

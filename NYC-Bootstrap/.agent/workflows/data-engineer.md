@@ -342,16 +342,9 @@ docker-compose exec db psql -U spec_user -d spec_nyc -c "SELECT COUNT(*) FROM pr
 
 ---
 
-## Handoff
+## When Done
 
-When this phase is complete:
-
-1. Update `context.md`:
-   - Set Phase 1.4/1.5/1.6 status to `complete`
-   - Add "Data pipeline complete" to Recent Changes
-   - Set Next Action to "Model Training (Phase 1.7)"
-
-2. Notify Project Lead:
-   > "Data Engineering complete. Database contains [X] cleaned records. Ready for ML Engineer to begin model training."
-
-3. Route to: `/ml-engineer` workflow
+1. **Check off completed items** in `docs/NYC_IMPLEMENTATION_PLAN.md`
+2. **Update state** if changing phase: `.agent/workflows/state.yaml`
+3. **Commit**: `git commit -am "Complete [task] - Phase X.X"`
+4. **Handoff**: Route to `/ml-engineer` for model training

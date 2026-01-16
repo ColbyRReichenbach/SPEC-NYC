@@ -322,20 +322,13 @@ Target: ≥70% PPE10 on 2023 holdout
 
 ---
 
-## Handoff
+## When Done
 
-When model training is complete:
-
-1. Update `context.md`:
-   - Set Phase 1.7 to `complete`
-   - Record final metrics in "Key Metrics" section
-
-2. Commit artifacts:
+1. **Check off completed items** in `docs/NYC_IMPLEMENTATION_PLAN.md`
+2. **Update state** if changing phase: `.agent/workflows/state.yaml`
+3. **Commit artifacts**:
    ```bash
    git add models/ logs/
-   git commit -m "Add trained XGBoost v1.0 - PPE10: XX%"
+   git commit -m "Complete model training - PPE10: XX%"
    ```
-
-3. If metrics pass, proceed to Dashboard (Phase 1.8)
-
-4. Route to: `/project-lead` for next phase orchestration
+4. **Handoff**: Route to `/project-lead` for next phase

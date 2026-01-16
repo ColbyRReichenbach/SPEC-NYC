@@ -1,69 +1,99 @@
 ---
-description: Master orchestrator - routes tasks to appropriate workflows
+description: Master orchestrator - routes tasks based on implementation plan progress
 ---
 
 # Project Lead Workflow
 
-**Role**: Orchestrate project execution, enforce phase gating, and route tasks to specialized workflows.
+**Role**: Orchestrate project execution by reading implementation plan checkboxes and routing to the appropriate workflow.
+
+---
+
+## How This Works
+
+1. **Single Source of Truth**: `docs/NYC_IMPLEMENTATION_PLAN.md` checkboxes
+2. **Minimal State**: `.agent/workflows/state.yaml` (just a pointer)
+3. **No Manual Tracking**: The plan IS the tracker
 
 ---
 
 ## Before Any Work
 
 // turbo
-1. Read the current project state:
-   ```
-   View file: .agent/workflows/context.md
-   ```
-
-2. Check the implementation plan status:
-   ```
-   View file: docs/NYC_IMPLEMENTATION_PLAN.md
+1. Read current state:
+   ```bash
+   cat /Users/colbyreichenbach/SPEC-NYC/NYC-Bootstrap/.agent/workflows/state.yaml
    ```
 
-3. Identify the current phase and next uncompleted task
+// turbo
+2. Find next incomplete task in the implementation plan:
+   ```bash
+   grep -n "^\s*- \[ \]" /Users/colbyreichenbach/SPEC-NYC/NYC-Bootstrap/docs/NYC_IMPLEMENTATION_PLAN.md | head -5
+   ```
+
+3. Identify which phase that task belongs to and route accordingly.
 
 ---
 
 ## Task Routing Table
 
-Use this table to direct work to the appropriate workflow:
-
-| Request Contains | Route To | Workflow File |
-|-----------------|----------|---------------|
-| "setup", "docker", "infrastructure", "postgres" | Data Engineer | `/data-engineer` |
-| "ETL", "data", "BBL", "cleaning", "ingest" | Data Engineer | `/data-engineer` |
-| "schema", "database", "tables" | Data Engineer | `/data-engineer` |
-| "model", "training", "XGBoost", "Optuna" | ML Engineer | `/ml-engineer` |
-| "SHAP", "explain", "features" | ML Engineer | `/ml-engineer` |
-| "quantile", "uncertainty", "confidence" | ML Engineer | `/ml-engineer` |
-| "LLM", "prompt", "token", "OpenAI", "memo" | AI Security | `/ai-security` |
-| "API", "FastAPI", "endpoint" | Full-Stack (V3.0+) | `/full-stack` |
-| "frontend", "React", "UI" | Full-Stack (V3.0+) | `/full-stack` |
-| "test", "validate", "verify" | Validation | `/validate` |
+| Task Keywords | Phase | Route To |
+|--------------|-------|----------|
+| "docker", "compose", "postgres", "infrastructure" | 1.2 | `/data-engineer` |
+| "database", "schema", "SQLAlchemy", "tables" | 1.3 | `/data-engineer` |
+| "download", "ingest", "BBL", "connectors" | 1.4 | `/data-engineer` |
+| "clean", "filter", "ETL", "impute" | 1.5 | `/data-engineer` |
+| "spatial", "h3", "distance", "feature" | 1.6 | `/data-engineer` |
+| "train", "XGBoost", "Optuna", "model" | 1.7 | `/ml-engineer` |
+| "dashboard", "streamlit", "app" | 1.8 | `/data-engineer` |
+| "quantile", "confidence", "interval" | 2.1 | `/ml-engineer` |
+| "subway", "MTA", "flood" | 2.2 | `/data-engineer` |
+| "backtest", "holdout" | 2.3 | `/ml-engineer` |
+| "comps", "comparable", "similar" | 2.4 | `/ml-engineer` |
+| "FastAPI", "endpoint", "API" | 3.x | `/full-stack` |
+| "React", "frontend", "Next.js" | 3.x | `/full-stack` |
+| "LLM", "memo", "oracle", "OpenAI" | 4.x | `/ai-security` |
+| "RAG", "ChromaDB", "vector" | 4.x | `/ai-security` |
 
 ---
 
-## Phase Gating Rules
+## Phase Gating
 
-### V1.0 Gate (Must complete before V2.0)
-- [ ] Docker Compose runs successfully
-- [ ] PostgreSQL contains ≥50,000 cleaned records
-- [ ] XGBoost model achieves ≥70% PPE10
-- [ ] SHAP explanations render correctly
-- [ ] Git tagged as `v1.0`
+### Before V2.0 (Check ALL)
+```bash
+# Run this to check V1.0 readiness
+grep -E "^\s*- \[x\]" /Users/colbyreichenbach/SPEC-NYC/NYC-Bootstrap/docs/NYC_IMPLEMENTATION_PLAN.md | grep -E "(Docker Compose|PostgreSQL|Model achieves|SHAP|Map shows|README|Git tag.*v1)" | wc -l
+```
+Must return 7 (all V1.0 deliverables checked).
 
-### V2.0 Gate (Must complete before V3.0)
-- [ ] Quantile regression implemented
-- [ ] Confidence intervals displayed
-- [ ] Backtest achieves ≥70% PPE10
-- [ ] Git tagged as `v2.0`
+### Before V3.0 (Check ALL)
+V2.0 deliverables section must be complete.
 
-### V3.0 Gate (Must complete before V4.0)
-- [ ] FastAPI backend operational
-- [ ] React frontend functional
-- [ ] API latency <500ms
-- [ ] Git tagged as `v3.0`
+---
+
+## Completing a Task
+
+When a task is done:
+
+1. **Check it off in the plan** (edit NYC_IMPLEMENTATION_PLAN.md):
+   ```markdown
+   - [x] Task that was completed  ← Change [ ] to [x]
+   ```
+
+2. **Update state.yaml** (only if phase changes):
+   ```yaml
+   current_phase: "1.3"  ← Increment if moving to new phase
+   status: "in_progress"
+   last_updated: "2026-01-16"
+   last_milestone: "Infrastructure setup complete"
+   ```
+
+3. **Commit**:
+   ```bash
+   git add docs/NYC_IMPLEMENTATION_PLAN.md .agent/workflows/state.yaml
+   git commit -m "Complete [task] - Phase [X.X]"
+   ```
+
+That's it. No tables to maintain.
 
 ---
 
@@ -71,60 +101,42 @@ Use this table to direct work to the appropriate workflow:
 
 **ALWAYS DEFER these features** (from Implementation Plan):
 - User authentication
-- Multi-city support
+- Multi-city support  
 - Real-time data feeds
 - Mobile app
 - USPAP compliance
 
-If the user requests a deferred feature, respond:
-> "This feature is marked as deferred in the Implementation Plan. I recommend completing V1.0 first to prove the core value. Should I add this to a future milestone instead?"
+If requested, respond:
+> "This is marked as deferred. Let's complete V1.0 first—should I add this to a future milestone?"
 
 ---
 
-## After Task Completion
+## Quick Commands
 
-1. Update `context.md`:
-   - Mark task as `complete`
-   - Add entry to "Recent Changes"
-   - Update "Next Action"
-
-2. Update `NYC_IMPLEMENTATION_PLAN.md`:
-   - Check off completed items with `[x]`
-
-3. Commit changes:
-   ```bash
-   git add -A
-   git commit -m "Complete [task name] - Phase [X.X]"
-   ```
-
-4. If phase complete, suggest next phase and appropriate workflow
-
----
-
-## Emergency Protocols
-
-### If Build Fails
-Route to `/validate` workflow with error logs
-
-### If Model Performance Below Target
-1. Check data quality first (`/data-engineer` validation)
-2. Review feature engineering
-3. Consider hyperparameter re-tuning
-
-### If Blocked by External Dependency
-1. Add to "Blocking Issues" in `context.md`
-2. Suggest workaround or mock data approach
-3. Document in README
-
----
-
-## Quick Status Check
-
-// turbo
-Run this to verify project health:
+### See all completed tasks
 ```bash
-cd /Users/colbyreichenbach/SPEC-NYC/NYC-Bootstrap && \
-docker-compose ps 2>/dev/null || echo "Docker not running" && \
-ls -la data/raw/ 2>/dev/null || echo "No raw data yet" && \
-ls -la models/ 2>/dev/null || echo "No models yet"
+grep -c "^\s*- \[x\]" docs/NYC_IMPLEMENTATION_PLAN.md
 ```
+
+### See all remaining tasks
+```bash
+grep -c "^\s*- \[ \]" docs/NYC_IMPLEMENTATION_PLAN.md
+```
+
+### Check current phase completion
+```bash
+# Count checked items in Phase 1
+sed -n '/## Phase 1/,/## Phase 2/p' docs/NYC_IMPLEMENTATION_PLAN.md | grep -c "^\s*- \[x\]"
+```
+
+---
+
+## When Stuck
+
+1. Run `/validate` workflow to check project health
+2. Check for blocking issues in `state.yaml`
+3. Review the implementation plan for dependencies
+4. If blocked by external factor, add to state.yaml:
+   ```yaml
+   blocking: "Waiting for NYC data portal access"
+   ```
