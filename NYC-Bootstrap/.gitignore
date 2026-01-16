@@ -55,7 +55,8 @@ data/raw/
 *.swo
 .DS_Store
 Thumbs.db
-.agent/
+.agent/*
+!.agent/workflows/
 
 # ----- Generated Assets -----
 assets/*.png
