@@ -1,0 +1,54 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  db:
+    image: postgres:15-alpine
+    container_name: spec_nyc_db
+    environment:
+      POSTGRES_USER: spec
+      POSTGRES_PASSWORD: spec_password
+      POSTGRES_DB: spec_nyc
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U spec -d spec_nyc" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Streamlit Dashboard (V1-V2)
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: spec_nyc_app
+    ports:
+      - "8501:8501"
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://spec:spec_password@db:5432/spec_nyc
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+    volumes:
+      - .:/app
+      - ./data:/app/data
+      - ./models:/app/models
+    command: streamlit run app.py --server.port=8501 --server.address=0.0.0.0
+  # Redis Cache (V4 - optional)
+  # redis:
+  #   image: redis:7-alpine
+  #   container_name: spec_nyc_redis
+  #   ports:
+  #     - "6379:6379"
+
+volumes:
+  postgres_data:
+
+
+networks:
+  default:
+    name: spec_nyc_network
