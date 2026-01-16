@@ -55,8 +55,10 @@ data/raw/
 *.swo
 .DS_Store
 Thumbs.db
-.agent/*
-!.agent/workflows/
+.agent/
+
+# ----- Claude Code Config (Track agents and commands) -----
+# Note: .claude/ is tracked for agent definitions
 
 # ----- Generated Assets -----
 assets/*.png

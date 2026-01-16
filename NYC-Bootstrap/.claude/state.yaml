@@ -1,0 +1,9 @@
+# S.P.E.C. NYC Project State
+# Minimal pointer - the real source of truth is NYC_IMPLEMENTATION_PLAN.md checkboxes
+
+current_phase: "1.2"
+phase_name: "Infrastructure Setup"
+status: "not_started"  # not_started | in_progress | complete
+last_updated: "2026-01-16"
+blocking: null
+last_milestone: "Project scaffold and agent workflows created"
