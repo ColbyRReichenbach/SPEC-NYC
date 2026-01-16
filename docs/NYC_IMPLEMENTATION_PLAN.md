@@ -73,14 +73,15 @@ SPEC-NYC/
 - [x] Create `.env.example` with database credentials
 - [ ] Test: `docker-compose up -d` starts both services
 
-### 1.3 Database Schema
+### 1.3 Database Schema ✅
 
-- [ ] Create `src/database.py` with SQLAlchemy models
-- [ ] Define tables:
-  - `sales` (bbl, sale_price, sale_date, building_class, address, borough)
-  - `properties` (bbl, sqft, year_built, units_total, zoning, lat, lon)
-  - `predictions` (bbl, predicted_price, prediction_date, model_version)
-- [ ] Create initialization script to set up tables
+- [x] Create `src/database.py` with SQLAlchemy models
+- [x] Define tables (designed from actual Annualized Sales data):
+  - `sales` - 30 columns including coordinates, sale_price, sqft, year_built, h3_index
+  - `predictions` - predicted prices with uncertainty bounds
+  - `model_performance` - track model metrics over versions
+- [x] PostgreSQL running on port 5433 (Docker, avoids local postgres conflict)
+- [x] All tables created with proper indexes
 
 ### 1.4 Data Ingestion ✅
 
