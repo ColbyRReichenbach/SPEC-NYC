@@ -3,7 +3,7 @@
 
 current_phase: "1.2"
 phase_name: "Infrastructure Setup"
-status: "not_started"  # not_started | in_progress | complete
+status: "in_progress"  # not_started | in_progress | complete
 last_updated: "2026-01-16"
 blocking: null
-last_milestone: "Project scaffold and agent workflows created"
+last_milestone: "Phase 1.1 complete, infrastructure files created"

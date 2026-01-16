@@ -32,8 +32,8 @@ This project is being built following the [Implementation Plan](docs/NYC_IMPLEME
 
 ```bash
 # 1. Clone and setup
-git clone https://github.com/ColbyRReichenbach/S.P.E.C-Valuation-NYC.git
-cd S.P.E.C-Valuation-NYC
+git clone https://github.com/ColbyRReichenbach/SPEC-NYC.git
+cd SPEC-NYC
 
 # 2. Copy environment file
 cp .env.example .env

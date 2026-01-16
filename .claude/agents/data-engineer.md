@@ -37,10 +37,10 @@ You are a Data Engineer for S.P.E.C. NYC, specializing in NYC property data pipe
 
 ```bash
 # Count records
-docker-compose exec db psql -U spec_user -d spec_nyc -c "SELECT COUNT(*) FROM sales;"
+docker-compose exec db psql -U spec -d spec_nyc -c "SELECT COUNT(*) FROM sales;"
 
 # Verify no bad data
-docker-compose exec db psql -U spec_user -d spec_nyc -c "SELECT COUNT(*) FROM sales WHERE sale_price < 10000;"
+docker-compose exec db psql -U spec -d spec_nyc -c "SELECT COUNT(*) FROM sales WHERE sale_price < 10000;"
 # Should return 0
 ```
 

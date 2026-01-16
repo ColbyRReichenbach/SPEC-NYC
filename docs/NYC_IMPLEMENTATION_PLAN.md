@@ -33,13 +33,14 @@ This document serves as the master workflow for building S.P.E.C.-NYC, a product
 
 ### 1.1 Project Setup
 
-- [ ] Create new repository `S.P.E.C-Valuation-NYC`
-- [ ] Initialize with Python .gitignore
-- [ ] Create directory structure:
+- [x] Create new repository `SPEC-NYC`
+- [x] Initialize with Python .gitignore
+- [x] Create directory structure:
 ```
-S.P.E.C-Valuation-NYC/
-├── .agent/
-│   └── workflows/
+SPEC-NYC/
+├── .claude/
+│   ├── agents/
+│   └── commands/
 ├── config/
 │   └── settings.py
 ├── data/
@@ -61,12 +62,12 @@ S.P.E.C-Valuation-NYC/
 
 ### 1.2 Infrastructure Setup
 
-- [ ] Create `docker-compose.yml` with:
+- [x] Create `docker-compose.yml` with:
   - PostgreSQL 15 service (port 5432)
   - Streamlit app service (port 8501)
   - Shared network
-- [ ] Create `Dockerfile` for Streamlit app
-- [ ] Create `.env.example` with database credentials
+- [x] Create `Dockerfile` for Streamlit app
+- [x] Create `.env.example` with database credentials
 - [ ] Test: `docker-compose up -d` starts both services
 
 ### 1.3 Database Schema

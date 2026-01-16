@@ -16,7 +16,7 @@ Run these in sequence:
 docker-compose ps
 
 # 2. Database connection
-docker-compose exec db psql -U spec_user -d spec_nyc -c "SELECT 1;"
+docker-compose exec db psql -U spec -d spec_nyc -c "SELECT 1;"
 
 # 3. Python environment
 python -c "import xgboost; import shap; print('Dependencies OK')"
@@ -29,10 +29,10 @@ ls -la data/ models/ logs/ src/
 
 ```bash
 # Record count
-docker-compose exec db psql -U spec_user -d spec_nyc -c "SELECT COUNT(*) FROM sales;"
+docker-compose exec db psql -U spec -d spec_nyc -c "SELECT COUNT(*) FROM sales;"
 
 # Data quality
-docker-compose exec db psql -U spec_user -d spec_nyc -c "
+docker-compose exec db psql -U spec -d spec_nyc -c "
 SELECT
     COUNT(*) as total,
     COUNT(CASE WHEN sale_price < 10000 THEN 1 END) as below_threshold,
