@@ -1,9 +1,16 @@
 # S.P.E.C. NYC Project State
 # Minimal pointer - the real source of truth is NYC_IMPLEMENTATION_PLAN.md checkboxes
 
-current_phase: "1.2"
-phase_name: "Infrastructure Setup"
+current_phase: "1.5"
+phase_name: "Data Cleaning (ETL)"
 status: "in_progress"  # not_started | in_progress | complete
 last_updated: "2026-01-16"
 blocking: null
-last_milestone: "Phase 1.1 complete, infrastructure files created"
+last_milestone: "Phase 1.4 complete - 498K records downloaded via Annualized Sales API"
+
+# Data acquisition summary:
+# - Source: NYC Annualized Sales API (w2pb-icbu)
+# - Records: 498,666 (2019-2024)
+# - Coordinate coverage: 97.4%
+# - Cache: data/raw/annualized_sales_2019_2025.csv
+# - Decision log: docs/DATA_SOURCES_DECISION_LOG.md

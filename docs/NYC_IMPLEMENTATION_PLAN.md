@@ -21,9 +21,12 @@ This document serves as the master workflow for building S.P.E.C.-NYC, a product
 
 | Dataset | URL | Purpose |
 |---------|-----|---------|
-| NYC Rolling Sales | https://www.nyc.gov/site/finance/taxes/property-rolling-sales-data.page | Transaction prices |
-| PLUTO | https://www.nyc.gov/site/planning/data-maps/open-data/dwn-pluto-mappluto.page | Building characteristics |
+| NYC Rolling Sales | https://www.nyc.gov/site/finance/taxes/property-rolling-sales-data.page | ~~Original source~~ Replaced by Annualized Sales API |
+| PLUTO | https://www.nyc.gov/site/planning/data-maps/open-data/dwn-pluto-mappluto.page | ~~For coords~~ Not needed (Annualized has lat/lon) |
+| **Annualized Sales** | `w2pb-icbu` API | **Primary source**: 498K records, 2019-2024 |
 | MTA Subway Stations | https://data.ny.gov/Transportation/MTA-Subway-Stations/39hk-dx4f | Transit proximity |
+
+> **📋 See `docs/DATA_SOURCES_DECISION_LOG.md`** for full rationale on why we use Annualized Sales.
 
 **Join Key**: Borough-Block-Lot (BBL) identifier
 
@@ -79,15 +82,23 @@ SPEC-NYC/
   - `predictions` (bbl, predicted_price, prediction_date, model_version)
 - [ ] Create initialization script to set up tables
 
-### 1.4 Data Ingestion
+### 1.4 Data Ingestion ✅
 
-- [ ] Download NYC Rolling Sales (Manhattan + Brooklyn, last 5 years)
-- [ ] Download PLUTO dataset (Manhattan + Brooklyn)
-- [ ] Create `src/connectors.py` with:
-  - `load_rolling_sales(borough: str) -> pd.DataFrame`
-  - `load_pluto(borough: str) -> pd.DataFrame`
-  - `join_sales_pluto(sales: pd.DataFrame, pluto: pd.DataFrame) -> pd.DataFrame`
-- [ ] Implement BBL parsing (Borough + Block + Lot)
+> **Note**: Original plan called for Rolling Sales + PLUTO. We switched to Annualized Sales API 
+> which includes coordinates. See `docs/DATA_SOURCES_DECISION_LOG.md` for rationale.
+
+- [x] ~~Download NYC Rolling Sales~~ → Using Annualized Sales API instead
+- [x] ~~Download PLUTO dataset~~ → Not needed (Annualized has lat/lon)
+- [x] Create `src/connectors.py` with:
+  - `download_annualized_sales(start_year, end_year)` → Downloads 498K records
+  - `download_pluto_coordinates()` → Available if needed later
+  - Rate limiting (2s delay), retry logic, caching
+- [x] BBL available directly in Annualized Sales dataset
+
+**Data Downloaded**:
+- Records: 498,666 (2019-2024)
+- Coverage: 97.4% have coordinates
+- Cache: `data/raw/annualized_sales_2019_2025.csv`
 
 ### 1.5 Data Cleaning
 

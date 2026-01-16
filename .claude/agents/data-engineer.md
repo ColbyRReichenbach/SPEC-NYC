@@ -17,20 +17,29 @@ You are a Data Engineer for S.P.E.C. NYC, specializing in NYC property data pipe
 
 ## Data Sources
 
-| Dataset | URL | Join Key |
-|---------|-----|----------|
-| NYC Rolling Sales | nyc.gov/finance/taxes/property-rolling-sales-data | BBL |
-| PLUTO | nyc.gov/site/planning/data-maps/open-data/dwn-pluto-mappluto | BBL |
-| MTA Subway | data.ny.gov (MTA Subway Stations) | Spatial join |
+> **Decision**: We use Annualized Sales API instead of Rolling Sales + PLUTO.
+> See `docs/DATA_SOURCES_DECISION_LOG.md` for full rationale.
+
+| Dataset | API ID | Use |
+|---------|--------|-----|
+| **Annualized Sales** | `w2pb-icbu` | Primary: 498K records with lat/lon (2019-2024) |
+| MTA Subway | data.ny.gov (`39hk-dx4f`) | Spatial join for transit proximity |
+| PLUTO | `64uk-42ks` | Not needed (Annualized has coordinates) |
+
+**Why Annualized Sales?**
+- Rolling Sales API only has last 12 months
+- Annualized has 2016-2024 via single API
+- Includes lat/lon (no PLUTO join needed)
+- BBL provided as single field
 
 ## ETL Pipeline Steps
 
-1. **Ingest**: Load raw CSV from `data/raw/`
-2. **Parse BBL**: Create 10-char BBL from BOROUGH + BLOCK + LOT
-3. **Clean**: Filter zero/low sales, non-residential classes
+1. **Ingest**: Load `data/raw/annualized_sales_2019_2025.csv` (or run `src/connectors.py`)
+2. **Clean**: Filter zero/low sales, non-residential building classes
+3. **Validate**: Check coordinates exist, BBL format
 4. **Impute**: Fill missing sqft from building class median
-5. **Join**: Merge sales with PLUTO on BBL
-6. **Spatial**: Add H3 index and compute h3_price_lag
+5. **Spatial**: Add H3 index (res 8) and compute h3_price_lag
+6. **Split**: Train (2019-2024) / Test (2024 Q4 holdout)
 7. **Load**: Insert to PostgreSQL
 
 ## Validation Checks
