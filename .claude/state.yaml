@@ -1,12 +1,12 @@
 # S.P.E.C. NYC Project State
 # Minimal pointer - the real source of truth is NYC_IMPLEMENTATION_PLAN.md checkboxes
 
-current_phase: "1.5"
-phase_name: "Data Cleaning & Enrichment"
+current_phase: "1.8"
+phase_name: "Model Training"
 status: "in_progress"  # not_started | in_progress | complete
 last_updated: "2026-01-17"
 blocking: null
-last_milestone: "ETL v2 designed with property identification, sales history, and segmentation"
+last_milestone: "ETL v2 complete: 294,837 records with property ID, history, and segmentation loaded to Postgres"
 
 # Data Model Design (2026-01-17):
 # - property_id: BBL + apartment for unique identification

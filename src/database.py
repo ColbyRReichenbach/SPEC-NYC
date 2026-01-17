@@ -120,7 +120,7 @@ class Sales(Base):
     # ==========================================================================
     # PROPERTY IDENTIFICATION (for deduplication and history tracking)
     # ==========================================================================
-    property_id = Column(String(50), index=True)  # BBL + apartment (or just BBL if no apt)
+    property_id = Column(String(50))  # BBL + apartment (or just BBL if no apt)
     
     # ==========================================================================
     # SALES HISTORY (for appreciation analysis)
@@ -135,8 +135,8 @@ class Sales(Base):
     # ==========================================================================
     # PROPERTY SEGMENTATION (for cascading models)
     # ==========================================================================
-    property_segment = Column(String(20), index=True)  # SINGLE_FAMILY, WALKUP, ELEVATOR, SMALL_MULTI
-    price_tier = Column(String(10), index=True)  # entry, core, premium, luxury (within-segment quartile)
+    property_segment = Column(String(20))  # SINGLE_FAMILY, WALKUP, ELEVATOR, SMALL_MULTI
+    price_tier = Column(String(10))  # entry, core, premium, luxury (within-segment quartile)
     
     # ==========================================================================
     # DERIVED FEATURES (computed during ETL)
@@ -254,7 +254,7 @@ class ModelPerformance(Base):
 
 def create_tables():
     """Create all tables in the database."""
-    Base.metadata.create_all(bind=engine)
+    Base.metadata.create_all(bind=engine, checkfirst=True)
     print("✅ Database tables created successfully")
 
 

@@ -101,49 +101,56 @@ SPEC-NYC/
 - Coverage: 97.4% have coordinates
 - Cache: `data/raw/annualized_sales_2019_2025.csv`
 
-### 1.5 Data Cleaning & Enrichment
+### 1.5 Data Cleaning & Enrichment ✅
 
 **Filtering Rules:**
-- [ ] Filter `sale_price < 10000` (family transfers, non-market)
-- [ ] Filter non-residential building classes
-- [ ] Filter missing coordinates (cannot map)
-- [ ] Filter missing BBL (no property identifier)
+- [x] Filter `sale_price < 10000` (family transfers, non-market)
+- [x] Filter non-residential building classes
+- [x] Filter missing coordinates (cannot map)
+- [x] Filter missing BBL (no property identifier)
 
 **Property Identification (NEW):**
-- [ ] Create `property_id` = BBL + apartment_number (for condos/co-ops)
-- [ ] Keep ALL legitimate resales (same property, different dates)
-- [ ] Remove only TRUE duplicates (same property_id + date + price)
+- [x] Create `property_id` = BBL + apartment_number (for condos/co-ops)
+- [x] Keep ALL legitimate resales (same property, different dates)
+- [x] Remove only TRUE duplicates (same property_id + date + price)
 
 **Sales History Enrichment (NEW):**
-- [ ] `sale_sequence`: 1st, 2nd, 3rd sale of this property in dataset
-- [ ] `is_latest_sale`: Boolean flag for most recent sale per property
-- [ ] `previous_sale_price`: For appreciation calculation
-- [ ] `previous_sale_date`: For holding period analysis
-- [ ] `price_change_pct`: (current - previous) / previous
+- [x] `sale_sequence`: 1st, 2nd, 3rd sale of this property in dataset
+- [x] `is_latest_sale`: Boolean flag for most recent sale per property
+- [x] `previous_sale_price`: For appreciation calculation
+- [x] `previous_sale_date`: For holding period analysis
+- [x] `price_change_pct`: (current - previous) / previous
 
 **Missing Value Imputation:**
-- [ ] `gross_square_feet`: Hierarchical median (neighborhood+class → borough+class → class → citywide)
-- [ ] `year_built`: Hierarchical median (neighborhood → borough → citywide)
-- [ ] Track all imputations with `_imputed` flags
-- [ ] Document in `docs/DATA_QUALITY_LOG.md`
+- [x] `gross_square_feet`: Hierarchical median (neighborhood+class → borough+class → class → citywide)
+- [x] `year_built`: Hierarchical median (neighborhood → borough → citywide)
+- [x] Track all imputations with `_imputed` flags
+- [x] Document in `docs/DATA_QUALITY_LOG.md`
 
-### 1.6 Property Segmentation (NEW)
+**ETL Results (2025-01-17)**:
+- Raw records: 498,666
+- Final cleaned records: 294,837
+- Unique properties: 206,426
+- Properties with resales: 88,411
+- Segments: SINGLE_FAMILY (43.5%), ELEVATOR (42.4%), WALKUP (8.8%), SMALL_MULTI (5.3%)
+
+### 1.6 Property Segmentation (NEW) ✅
 
 **Segment Classification:**
 ```
 Segment          | Building Classes | Est. Records | Key Characteristics
 ─────────────────┼──────────────────┼──────────────┼────────────────────
-SINGLE_FAMILY    | 01, 02, 03       | ~80K         | Houses, standalone
-WALKUP           | 07, 09, 12       | ~30K         | No elevator apts
-ELEVATOR         | 08, 10, 13       | ~150K        | Doorman buildings
-SMALL_MULTI      | 14, 15, 16, 17   | ~20K         | 2-10 unit buildings
+SINGLE_FAMILY    | 01, 02, 03       | 128,266      | Houses, standalone
+WALKUP           | 07, 09, 12       | 25,944       | No elevator apts
+ELEVATOR         | 08, 10, 13       | 125,072      | Doorman buildings
+SMALL_MULTI      | 14, 15, 16, 17   | 15,555       | 2-10 unit buildings
 ```
 
-- [ ] Add `property_segment` column based on building_class
-- [ ] Add `price_tier` column (within-segment quartile: entry/core/premium/luxury)
-- [ ] Validate segment distribution
+- [x] Add `property_segment` column based on building_class
+- [x] Add `price_tier` column (within-segment quartile: entry/core/premium/luxury)
+- [x] Validate segment distribution
 
-### 1.7 Feature Engineering
+### 1.7 Feature Engineering ✅
 
 **Spatial Features:**
 - [x] `distance_to_center_km` - Distance to Manhattan (40.7831, -73.9712)
@@ -151,12 +158,12 @@ SMALL_MULTI      | 14, 15, 16, 17   | ~20K         | 2-10 unit buildings
 - [ ] `h3_price_lag` - Median price in neighboring hexes (computed at training time)
 
 **Time Features:**
-- [ ] `sale_month`, `sale_quarter` - Seasonality
+- [x] `sale_month`, `sale_quarter` - Seasonality
 - [ ] `days_on_market` - If available from listing data
 
 **Derived Features:**
-- [ ] `building_age` = current_year - year_built
-- [ ] `price_per_sqft` = sale_price / gross_square_feet (for comps, not training)
+- [x] `building_age` = current_year - year_built
+- [x] `price_per_sqft` = sale_price / gross_square_feet (for comps, not training)
 
 ### 1.8 Model Training (Global + Segment Features)
 
