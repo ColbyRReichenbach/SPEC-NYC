@@ -17,7 +17,7 @@ psycopg2-binary>=2.9.0
 
 # Spatial
 h3>=3.7.0
-geopandas>=0.14.0
+# geopandas>=0.14.0 (Requires system GDAL)
 
 # Dashboard (V1-V2)
 streamlit>=1.28.0

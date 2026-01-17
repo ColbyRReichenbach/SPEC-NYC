@@ -101,25 +101,30 @@ SPEC-NYC/
 - Coverage: 97.4% have coordinates
 - Cache: `data/raw/annualized_sales_2019_2025.csv`
 
-### 1.5 Data Cleaning
+### 1.5 Data Cleaning ✅
 
-- [ ] Create `src/etl.py` with cleaning rules:
+- [x] Create `src/etl.py` with cleaning rules:
   - Filter `sale_price == 0` (family transfers)
   - Filter `sale_price < 10000` (non-market)
   - Filter commercial building classes
   - Handle missing sqft (impute from building class median)
   - Remove duplicates (keep most recent per BBL)
-- [ ] Log cleaning statistics (records removed, reasons)
-- [ ] Save cleaned data to PostgreSQL
+- [x] Log cleaning statistics (records removed, reasons)
+- [x] Save cleaned data to PostgreSQL
+
+**ETL Results (2025-01-17)**:
+- Raw records: 498,666
+- After cleaning: 290,996 (58% retention)
+- All records in PostgreSQL `sales` table
 
 ### 1.6 Feature Engineering
 
-- [ ] Port `src/spatial.py` from SF project
-- [ ] Update city center coordinates to Manhattan (40.7831, -73.9712)
-- [ ] Compute features:
-  - `distance_to_center_km`
-  - `h3_index` (resolution 8)
-  - `h3_price_lag` (median price in hex neighbors)
+- [x] ~~Port `src/spatial.py` from SF project~~ (integrated into ETL)
+- [x] Update city center coordinates to Manhattan (40.7831, -73.9712)
+- [x] Compute features:
+  - `distance_to_center_km` ✓
+  - `h3_index` (resolution 8) ✓
+  - `h3_price_lag` (median price in hex neighbors) - *deferred to model training*
 - [ ] Create feature matrix for model training
 
 ### 1.7 Model Training
