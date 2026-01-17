@@ -117,6 +117,42 @@ class Sales(Base):
     # BIN (Building Identification Number)
     bin_number = Column(BigInteger)  # NYC BIN
     
+    # ==========================================================================
+    # PROPERTY IDENTIFICATION (for deduplication and history tracking)
+    # ==========================================================================
+    property_id = Column(String(50), index=True)  # BBL + apartment (or just BBL if no apt)
+    
+    # ==========================================================================
+    # SALES HISTORY (for appreciation analysis)
+    # ==========================================================================
+    sale_sequence = Column(Integer)  # 1st, 2nd, 3rd sale of this property in dataset
+    is_latest_sale = Column(Boolean, default=False, index=True)  # Most recent sale per property
+    previous_sale_price = Column(BigInteger)  # Prior sale price (NULL if first sale)
+    previous_sale_date = Column(Date)  # Prior sale date
+    price_change_pct = Column(Float)  # (current - previous) / previous * 100
+    days_since_last_sale = Column(Integer)  # Holding period
+    
+    # ==========================================================================
+    # PROPERTY SEGMENTATION (for cascading models)
+    # ==========================================================================
+    property_segment = Column(String(20), index=True)  # SINGLE_FAMILY, WALKUP, ELEVATOR, SMALL_MULTI
+    price_tier = Column(String(10), index=True)  # entry, core, premium, luxury (within-segment quartile)
+    
+    # ==========================================================================
+    # DERIVED FEATURES (computed during ETL)
+    # ==========================================================================
+    building_age = Column(Integer)  # current_year - year_built
+    price_per_sqft = Column(Float)  # sale_price / gross_square_feet (for comps display)
+    sale_month = Column(Integer)  # 1-12 for seasonality
+    sale_quarter = Column(Integer)  # 1-4 for seasonality
+    
+    # ==========================================================================
+    # IMPUTATION TRACKING (for transparency - see docs/DATA_QUALITY_LOG.md)
+    # ==========================================================================
+    sqft_imputed = Column(Boolean, default=False)  # True if gross_square_feet was imputed
+    sqft_imputation_level = Column(String(20))  # 'neighborhood_class', 'borough_class', 'class_only', 'citywide'
+    year_built_imputed = Column(Boolean, default=False)  # True if year_built was imputed
+    
     # Metadata
     created_at = Column(DateTime, default=datetime.utcnow)
     
@@ -125,6 +161,8 @@ class Sales(Base):
         Index('ix_sales_borough_year', 'borough', 'sale_year'),
         Index('ix_sales_coords', 'latitude', 'longitude'),
         Index('ix_sales_price_range', 'sale_price', 'sale_year'),
+        Index('ix_sales_property_segment', 'property_segment', 'price_tier'),
+        Index('ix_sales_property_history', 'property_id', 'sale_date'),
     )
     
     def __repr__(self):

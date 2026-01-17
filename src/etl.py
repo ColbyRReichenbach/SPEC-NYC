@@ -1,19 +1,27 @@
 """
-S.P.E.C. NYC - ETL Pipeline
+S.P.E.C. NYC - ETL Pipeline (v2)
 
 Extracts data from raw CSVs (Annualized Sales),
-Transforms it (Cleaning + Feature Engineering),
+Transforms it (Cleaning + Enrichment + Segmentation),
 Loads it into PostgreSQL.
+
+Key Features:
+- Property identification (BBL + apartment)
+- Sales history tracking (resales, appreciation)
+- Property segmentation (for cascading models)
+- Hierarchical imputation with transparency
 
 Usage:
     python -m src.etl
+
+See docs/DATA_QUALITY_LOG.md for transformation documentation.
 """
 
 import logging
 import pandas as pd
 import numpy as np
 import h3
-from sqlalchemy.orm import Session
+from datetime import datetime
 from pathlib import Path
 
 from src.database import get_session, engine, Sales, create_tables
@@ -30,20 +38,38 @@ logger = logging.getLogger(__name__)
 # =============================================================================
 
 RAW_DATA_PATH = Path("data/raw/annualized_sales_2019_2025.csv")
+CURRENT_YEAR = 2025  # For building_age calculation
 
-# NYC Center (Manhattan)
+# NYC Center (Manhattan - Columbus Circle)
 NYC_CENTER_LAT = 40.7831
 NYC_CENTER_LON = -73.9712
 
-# H3 Resolution
-H3_RESOLUTION = 8  # ~460m edge length
+# H3 Resolution (8 = ~460m edge length, good for neighborhood granularity)
+H3_RESOLUTION = 8
 
 # Building Class Categories to Keep (Residential)
 RESIDENTIAL_PREFIXES = ["01", "02", "03", "07", "08", "09", "10", "12", "13", "14", "15", "16", "17"]
 
+# Property Segment Mapping (building_class_category prefix -> segment)
+SEGMENT_MAPPING = {
+    "01": "SINGLE_FAMILY",   # One Family Dwellings
+    "02": "SINGLE_FAMILY",   # Two Family Dwellings
+    "03": "SINGLE_FAMILY",   # Three Family Dwellings
+    "07": "WALKUP",          # Rentals - Walkup Apartments
+    "08": "ELEVATOR",        # Rentals - Elevator Apartments
+    "09": "WALKUP",          # Coops - Walkup Apartments
+    "10": "ELEVATOR",        # Coops - Elevator Apartments
+    "12": "WALKUP",          # Condos - Walkup Apartments
+    "13": "ELEVATOR",        # Condos - Elevator Apartments
+    "14": "SMALL_MULTI",     # Rentals - 4-10 Unit
+    "15": "SMALL_MULTI",     # Condos - 2-10 Unit Residential
+    "16": "SMALL_MULTI",     # Condos - 2-10 Unit with Commercial
+    "17": "SMALL_MULTI",     # Condo Coops
+}
+
 
 # =============================================================================
-# 1. Extraction
+# 1. EXTRACTION
 # =============================================================================
 
 def load_raw_data(path: Path) -> pd.DataFrame:
@@ -52,8 +78,6 @@ def load_raw_data(path: Path) -> pd.DataFrame:
         raise FileNotFoundError(f"Raw data not found at {path}. Run src/connectors.py first.")
     
     logger.info(f"Loading raw data from {path}...")
-    
-    # Load with low_memory=False to avoid dtypes warnings
     df = pd.read_csv(path, low_memory=False)
     logger.info(f"Loaded {len(df):,} records")
     
@@ -61,23 +85,22 @@ def load_raw_data(path: Path) -> pd.DataFrame:
 
 
 # =============================================================================
-# 2. Transformation
+# 2. CLEANING
 # =============================================================================
 
 def clean_data(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Clean the data:
-    - Filter invalid prices
-    - Keep only residential
-    - Remove missing critical fields
-    - Fix data types
+    Clean the raw data:
+    - Standardize column names
+    - Filter invalid/non-market sales
+    - Filter non-residential properties
+    - Filter missing critical fields
     """
     initial_count = len(df)
     
-    # 1. Standardize column names (strip whitespace)
+    # 1. Standardize column names
     df.columns = [c.strip().lower().replace(" ", "_") for c in df.columns]
     
-    # 1b. Rename columns to match Schema
     rename_map = {
         'building_class_at_time_of': 'building_class',
         'tax_class_at_time_of_sale': 'tax_class',
@@ -86,164 +109,414 @@ def clean_data(df: pd.DataFrame) -> pd.DataFrame:
     }
     df = df.rename(columns=rename_map)
     
-    # 2. Filter Sales Price (Target)
-    # Remove transfer/low sales (< $10k)
-    df = df[df['sale_price'].notna()]
-    df = df[df['sale_price'] >= 10_000]
-    logger.info(f"Filtered low/zero sales: {initial_count} -> {len(df)} records")
-    
-    # 3. Filter Residential Only
-    # Filter by building_class_category prefix
-    # Categories start with a number, e.g., "01 ONE FAMILY DWELLINGS"
-    if 'building_class_category' in df.columns:
-        # Extract first 2 digits
-        df['category_code'] = df['building_class_category'].astype(str).str[:2]
-        df = df[df['category_code'].isin(RESIDENTIAL_PREFIXES)]
-        logger.info(f"Filtered non-residential: -> {len(df)} records")
-        
-        # Drop helper col
-        df = df.drop(columns=['category_code'])
-    
-    # 4. Filter Missing Coordinates
-    df = df.dropna(subset=['latitude', 'longitude'])
-    logger.info(f"Filtered missing coordinates: -> {len(df)} records")
-    
-    # 4b. Filter Missing BBL (required for database)
-    df = df.dropna(subset=['bbl'])
-    df['bbl'] = df['bbl'].astype('int64')  # Convert to integer for database
-    logger.info(f"Filtered missing BBL: -> {len(df)} records")
-    
-    # 5. Clean Numeric Columns (strip commas from strings)
-    numeric_cols = ['land_square_feet', 'gross_square_feet']
+    # 2. Clean numeric columns
+    numeric_cols = ['land_square_feet', 'gross_square_feet', 'sale_price']
     for col in numeric_cols:
         if col in df.columns:
-            # Check if string type before string ops, otherwise just ensure numeric
             if df[col].dtype == object:
                 df[col] = pd.to_numeric(df[col].astype(str).str.replace(",", ""), errors='coerce')
             else:
-                 df[col] = pd.to_numeric(df[col], errors='coerce')
-
-    # 6. Date Parsing
+                df[col] = pd.to_numeric(df[col], errors='coerce')
+    
+    # 3. Filter: Sale price >= $10,000 (non-market sales)
+    df = df[df['sale_price'].notna()]
+    df = df[df['sale_price'] >= 10_000]
+    logger.info(f"Filtered low/zero sales: {initial_count:,} -> {len(df):,} records")
+    
+    # 4. Filter: Residential only
+    if 'building_class_category' in df.columns:
+        df['category_code'] = df['building_class_category'].astype(str).str[:2]
+        df = df[df['category_code'].isin(RESIDENTIAL_PREFIXES)]
+        logger.info(f"Filtered non-residential: -> {len(df):,} records")
+        df = df.drop(columns=['category_code'])
+    
+    # 5. Filter: Must have coordinates
+    df = df.dropna(subset=['latitude', 'longitude'])
+    logger.info(f"Filtered missing coordinates: -> {len(df):,} records")
+    
+    # 6. Filter: Must have BBL
+    df = df.dropna(subset=['bbl'])
+    df['bbl'] = df['bbl'].astype('int64')
+    logger.info(f"Filtered missing BBL: -> {len(df):,} records")
+    
+    # 7. Parse dates
     df['sale_date'] = pd.to_datetime(df['sale_date'])
     df['sale_year'] = df['sale_date'].dt.year
+    df['sale_month'] = df['sale_date'].dt.month
+    df['sale_quarter'] = df['sale_date'].dt.quarter
     
-    # 6b. Convert year_built to integer (handle NaN as 0)
+    # 8. year_built to integer (0 for missing)
     df['year_built'] = df['year_built'].fillna(0).astype('int64')
-    
-    # 7. Deduplicate (Keep most recent sale per BBL + Price combo to avoid duplicates)
-    # Actually, same BBL can sell multiple times. We keep all *valid* sales.
-    # But exact duplicates (same BBL, date, price) should be removed.
-    df = df.drop_duplicates(subset=['bbl', 'sale_date', 'sale_price'])
-    logger.info(f"Removed duplicates: -> {len(df)} records")
     
     return df
 
 
-def impute_missing_values(df: pd.DataFrame) -> pd.DataFrame:
-    """Impute missing sqft using neighborhood + building class median."""
+# =============================================================================
+# 3. PROPERTY IDENTIFICATION
+# =============================================================================
+
+def create_property_id(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Create unique property identifier:
+    - For single-family: just BBL
+    - For condos/co-ops: BBL + apartment_number
     
-    # 1. Gross Square Feet
-    # If sqft is 0 or NaN, it needs imputation
+    This allows tracking resales of the SAME UNIT vs different units in same building.
+    """
+    logger.info("Creating property_id (BBL + apartment where applicable)...")
+    
+    def make_property_id(row):
+        bbl = str(int(row['bbl']))
+        apt = str(row['apartment_number']).strip() if pd.notna(row['apartment_number']) else ''
+        if apt and apt.lower() not in ['nan', '', 'none']:
+            return f"{bbl}_{apt}"
+        return bbl
+    
+    df['property_id'] = df.apply(make_property_id, axis=1)
+    
+    unique_properties = df['property_id'].nunique()
+    logger.info(f"Created {unique_properties:,} unique property IDs from {len(df):,} sales")
+    
+    return df
+
+
+def deduplicate(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Remove TRUE duplicates only:
+    - Same property_id + same sale_date + same sale_price = duplicate
+    
+    Keep all legitimate resales (same property, different transactions).
+    """
+    before = len(df)
+    
+    # Sort by property_id, sale_date, then keep first occurrence of duplicates
+    df = df.sort_values(['property_id', 'sale_date', 'sale_price'])
+    df = df.drop_duplicates(subset=['property_id', 'sale_date', 'sale_price'], keep='first')
+    
+    after = len(df)
+    logger.info(f"Removed TRUE duplicates: {before:,} -> {after:,} records ({before - after:,} removed)")
+    
+    return df
+
+
+# =============================================================================
+# 4. SALES HISTORY ENRICHMENT
+# =============================================================================
+
+def enrich_sales_history(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    For each property, track sales history:
+    - sale_sequence: 1st, 2nd, 3rd sale
+    - is_latest_sale: True for most recent
+    - previous_sale_price/date: Prior sale info
+    - price_change_pct: Appreciation
+    """
+    logger.info("Enriching sales history...")
+    
+    # Sort by property and date
+    df = df.sort_values(['property_id', 'sale_date'])
+    
+    # Sale sequence within each property
+    df['sale_sequence'] = df.groupby('property_id').cumcount() + 1
+    
+    # Is latest sale?
+    df['is_latest_sale'] = df.groupby('property_id')['sale_date'].transform('max') == df['sale_date']
+    
+    # Previous sale info (shift within group)
+    df['previous_sale_price'] = df.groupby('property_id')['sale_price'].shift(1)
+    df['previous_sale_date'] = df.groupby('property_id')['sale_date'].shift(1)
+    
+    # Price change percentage
+    mask_has_previous = df['previous_sale_price'].notna()
+    df.loc[mask_has_previous, 'price_change_pct'] = (
+        (df.loc[mask_has_previous, 'sale_price'] - df.loc[mask_has_previous, 'previous_sale_price']) 
+        / df.loc[mask_has_previous, 'previous_sale_price'] * 100
+    )
+    
+    # Days since last sale
+    df.loc[mask_has_previous, 'days_since_last_sale'] = (
+        (df.loc[mask_has_previous, 'sale_date'] - df.loc[mask_has_previous, 'previous_sale_date']).dt.days
+    )
+    
+    # Stats
+    resales = (df['sale_sequence'] > 1).sum()
+    latest_sales = df['is_latest_sale'].sum()
+    logger.info(f"  ├─ Properties with resales: {resales:,}")
+    logger.info(f"  └─ Latest sales (for map): {latest_sales:,}")
+    
+    return df
+
+
+# =============================================================================
+# 5. PROPERTY SEGMENTATION
+# =============================================================================
+
+def assign_segments(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Assign property segments for cascading model architecture:
+    - SINGLE_FAMILY: Houses (01, 02, 03)
+    - WALKUP: No-elevator apartments (07, 09, 12)
+    - ELEVATOR: Doorman buildings (08, 10, 13)
+    - SMALL_MULTI: 2-10 unit buildings (14, 15, 16, 17)
+    """
+    logger.info("Assigning property segments...")
+    
+    # Extract category prefix
+    df['category_prefix'] = df['building_class_category'].astype(str).str[:2]
+    
+    # Map to segment
+    df['property_segment'] = df['category_prefix'].map(SEGMENT_MAPPING)
+    df['property_segment'] = df['property_segment'].fillna('OTHER')
+    
+    # Drop helper column
+    df = df.drop(columns=['category_prefix'])
+    
+    # Segment distribution
+    segment_counts = df['property_segment'].value_counts()
+    logger.info("Segment distribution:")
+    for seg, count in segment_counts.items():
+        logger.info(f"  {seg}: {count:,} ({count/len(df)*100:.1f}%)")
+    
+    return df
+
+
+def assign_price_tiers(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Assign within-segment price tiers:
+    - entry: Bottom 25%
+    - core: 25-50%
+    - premium: 50-75%
+    - luxury: Top 25%
+    
+    Tiers are computed WITHIN each segment for fair comparison.
+    """
+    logger.info("Assigning price tiers within segments...")
+    
+    def tier_func(x):
+        q = pd.qcut(x, q=4, labels=['entry', 'core', 'premium', 'luxury'], duplicates='drop')
+        return q
+    
+    # Compute quartiles within each segment
+    df['price_tier'] = df.groupby('property_segment')['sale_price'].transform(
+        lambda x: pd.qcut(x.rank(method='first'), q=4, labels=['entry', 'core', 'premium', 'luxury'])
+    )
+    
+    # Show tier distribution
+    tier_counts = df['price_tier'].value_counts()
+    logger.info("Price tier distribution:")
+    for tier in ['entry', 'core', 'premium', 'luxury']:
+        if tier in tier_counts.index:
+            logger.info(f"  {tier}: {tier_counts[tier]:,}")
+    
+    return df
+
+
+# =============================================================================
+# 6. IMPUTATION
+# =============================================================================
+
+def impute_missing_values(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Impute missing values using hierarchical median imputation.
+    
+    Strategy documented in docs/DATA_QUALITY_LOG.md:
+    - Uses median from most granular group available
+    - Falls back to broader groups if no median exists
+    - Tracks imputation source for transparency
+    """
+    
+    # ==========================================================================
+    # GROSS SQUARE FEET
+    # ==========================================================================
+    df['sqft_imputed'] = False
+    df['sqft_imputation_level'] = None
+    
     mask_missing = (df['gross_square_feet'].isna()) | (df['gross_square_feet'] == 0)
     missing_count = mask_missing.sum()
     
     if missing_count > 0:
-        logger.info(f"Imputing {missing_count} records with missing SQFT...")
+        logger.info(f"Imputing {missing_count:,} records with missing/zero SQFT...")
         
-        # Calculate medians by Neighborhood + Building Class prefix (first 1 char)
-        df['class_prefix'] = df['building_class'].astype(str).str[:1]
+        valid_df = df[~mask_missing]
         
-        medians = df[~mask_missing].groupby(['neighborhood', 'class_prefix'])['gross_square_feet'].transform('median')
+        # Compute medians at each level
+        level1_medians = valid_df.groupby(['neighborhood', 'building_class'])['gross_square_feet'].median()
+        level2_medians = valid_df.groupby(['borough', 'building_class'])['gross_square_feet'].median()
+        level3_medians = valid_df.groupby('building_class')['gross_square_feet'].median()
+        level4_median = valid_df['gross_square_feet'].median()
         
-        # Fill missing
-        df.loc[mask_missing, 'gross_square_feet'] = medians[mask_missing]
+        imputed_count = {'level1': 0, 'level2': 0, 'level3': 0, 'level4': 0}
         
-        # If still missing (no median in that group), use citywide median for that class prefix
-        mask_still_missing = (df['gross_square_feet'].isna()) | (df['gross_square_feet'] == 0)
-        if mask_still_missing.sum() > 0:
-            city_medians = df[~mask_still_missing].groupby('class_prefix')['gross_square_feet'].transform('median')
-            df.loc[mask_still_missing, 'gross_square_feet'] = city_medians[mask_still_missing]
+        for idx in df[mask_missing].index:
+            neighborhood = df.loc[idx, 'neighborhood']
+            building_class = df.loc[idx, 'building_class']
+            borough = df.loc[idx, 'borough']
             
-        # Drop helper
-        df = df.drop(columns=['class_prefix'])
+            imputed_value = None
+            imputation_level = None
+            
+            # Level 1: Neighborhood + Building Class
+            try:
+                if (neighborhood, building_class) in level1_medians.index:
+                    val = level1_medians[(neighborhood, building_class)]
+                    if pd.notna(val) and val > 0:
+                        imputed_value = val
+                        imputation_level = 'neighborhood_class'
+                        imputed_count['level1'] += 1
+            except (KeyError, TypeError):
+                pass
+            
+            # Level 2: Borough + Building Class
+            if imputed_value is None:
+                try:
+                    if (borough, building_class) in level2_medians.index:
+                        val = level2_medians[(borough, building_class)]
+                        if pd.notna(val) and val > 0:
+                            imputed_value = val
+                            imputation_level = 'borough_class'
+                            imputed_count['level2'] += 1
+                except (KeyError, TypeError):
+                    pass
+            
+            # Level 3: Building Class only
+            if imputed_value is None:
+                try:
+                    if building_class in level3_medians.index:
+                        val = level3_medians[building_class]
+                        if pd.notna(val) and val > 0:
+                            imputed_value = val
+                            imputation_level = 'class_only'
+                            imputed_count['level3'] += 1
+                except (KeyError, TypeError):
+                    pass
+            
+            # Level 4: Citywide fallback
+            if imputed_value is None:
+                imputed_value = level4_median if pd.notna(level4_median) else 1200  # Default 1200 sqft
+                imputation_level = 'citywide'
+                imputed_count['level4'] += 1
+            
+            df.loc[idx, 'gross_square_feet'] = imputed_value
+            df.loc[idx, 'sqft_imputed'] = True
+            df.loc[idx, 'sqft_imputation_level'] = imputation_level
         
-        logger.info(f"Remaining missing SQFT: {((df['gross_square_feet'].isna()) | (df['gross_square_feet'] == 0)).sum()}")
+        logger.info(f"  ├─ Neighborhood+Class: {imputed_count['level1']:,}")
+        logger.info(f"  ├─ Borough+Class: {imputed_count['level2']:,}")
+        logger.info(f"  ├─ Class-only: {imputed_count['level3']:,}")
+        logger.info(f"  └─ Citywide: {imputed_count['level4']:,}")
+    
+    # ==========================================================================
+    # YEAR BUILT
+    # ==========================================================================
+    df['year_built_imputed'] = False
+    mask_missing_year = (df['year_built'] == 0) | (df['year_built'].isna())
+    missing_year_count = mask_missing_year.sum()
+    
+    if missing_year_count > 0:
+        logger.info(f"Imputing {missing_year_count:,} records with missing year_built...")
+        
+        valid_years = df[~mask_missing_year]
+        year_medians_neighborhood = valid_years.groupby('neighborhood')['year_built'].median()
+        year_medians_borough = valid_years.groupby('borough')['year_built'].median()
+        citywide_year_median = valid_years['year_built'].median()
+        
+        for idx in df[mask_missing_year].index:
+            neighborhood = df.loc[idx, 'neighborhood']
+            borough = df.loc[idx, 'borough']
+            
+            imputed_year = None
+            
+            if neighborhood in year_medians_neighborhood.index:
+                imputed_year = year_medians_neighborhood[neighborhood]
+            
+            if imputed_year is None or pd.isna(imputed_year) or imputed_year == 0:
+                if borough in year_medians_borough.index:
+                    imputed_year = year_medians_borough[borough]
+            
+            if imputed_year is None or pd.isna(imputed_year) or imputed_year == 0:
+                imputed_year = citywide_year_median if pd.notna(citywide_year_median) else 1960
+            
+            df.loc[idx, 'year_built'] = int(imputed_year)
+            df.loc[idx, 'year_built_imputed'] = True
+        
+        logger.info(f"  └─ Imputed {missing_year_count:,} year_built values")
+    
+    df['year_built'] = df['year_built'].astype('int64')
     
     return df
 
 
+# =============================================================================
+# 7. FEATURE ENGINEERING
+# =============================================================================
+
 def feature_engineering(df: pd.DataFrame) -> pd.DataFrame:
-    """Add spatial and temporal features."""
+    """Add derived and spatial features."""
     
-    # 1. H3 Indexing (Spatial Hexagons)
+    # 1. H3 Spatial Index
     logger.info(f"Generating H3 spatial indexes (res={H3_RESOLUTION})...")
     df['h3_index'] = df.apply(
         lambda row: h3.latlng_to_cell(row['latitude'], row['longitude'], H3_RESOLUTION),
         axis=1
     )
     
-    # 2. Distance to Center (Manhattan) - Haversine Approximation
-    # Simple Euclidean on lat/lon is "good enough" for local sort, but let's do rough km
-    # 1 deg lat ~ 111 km
+    # 2. Distance to Center
     lat_diff = (df['latitude'] - NYC_CENTER_LAT) * 111
     lon_diff = (df['longitude'] - NYC_CENTER_LON) * 111 * np.cos(np.radians(NYC_CENTER_LAT))
-    
     df['distance_to_center_km'] = np.sqrt(lat_diff**2 + lon_diff**2)
+    
+    # 3. Building Age
+    df['building_age'] = CURRENT_YEAR - df['year_built']
+    df.loc[df['building_age'] < 0, 'building_age'] = 0  # Handle future dates
+    df.loc[df['building_age'] > 300, 'building_age'] = 100  # Cap at 100 years for 0 year_built
+    
+    # 4. Price per Square Foot
+    df['price_per_sqft'] = np.where(
+        df['gross_square_feet'] > 0,
+        df['sale_price'] / df['gross_square_feet'],
+        np.nan
+    )
     
     return df
 
 
 # =============================================================================
-# 3. Loading
+# 8. LOADING
 # =============================================================================
 
 def load_to_postgres(df: pd.DataFrame):
     """Insert processed data into PostgreSQL."""
     logger.info("Loading data to PostgreSQL...")
     
-    # Map DataFrame columns to SQLAlchemy model columns
-    # Any extra columns in DF (like 'zip_code') match exactly?
-    # We need to ensure types match.
-    
     records = df.to_dict(orient='records')
-    
-    # Create session
     session = get_session()
     
-    # Get valid column names from Sales model
     valid_columns = {c.key for c in Sales.__table__.columns}
     
     try:
-        # Truncate table first? (Optional, usually good for full reload)
-        # session.query(Sales).delete()
-        # session.commit()
-        
-        # But for safety, let's just insert. Using bulk_insert_mappings for speed.
         count = 0
         batch_size = 5000
         
-        # SQLAlchemy Core / Bulk insert is faster
         for i in range(0, len(records), batch_size):
             batch = records[i:i + batch_size]
             
-            # Map batch to Sales objects
             objects = []
             for row in batch:
-                # Handle potentially missing optional fields that confuse SQL
-                # AND filter out columns not in the model
+                # Filter to valid columns only
                 row_cleaned = {
-                    k: v for k, v in row.items() 
-                    if k in valid_columns and not pd.isna(v)
+                    k: (v if pd.notna(v) else None)
+                    for k, v in row.items() 
+                    if k in valid_columns
                 }
                 objects.append(Sales(**row_cleaned))
             
             session.bulk_save_objects(objects)
             count += len(batch)
             if count % 20000 == 0:
-                logger.info(f"Inserted {count} records...")
+                logger.info(f"Inserted {count:,} records...")
         
         session.commit()
-        logger.info(f"✅ Successfully loaded {count} records into 'sales' table.")
+        logger.info(f"✅ Successfully loaded {count:,} records into 'sales' table.")
         
     except Exception as e:
         session.rollback()
@@ -254,40 +527,57 @@ def load_to_postgres(df: pd.DataFrame):
 
 
 # =============================================================================
-# Main Pipeline
+# MAIN PIPELINE
 # =============================================================================
 
 def run_etl():
     """Execute the full ETL pipeline."""
     logger.info("=" * 60)
-    logger.info("Starting ETL Pipeline")
+    logger.info("S.P.E.C. NYC ETL Pipeline v2")
     logger.info("=" * 60)
     
     try:
-        # 1. Load
+        # 1. Extract
         df = load_raw_data(RAW_DATA_PATH)
         
         # 2. Clean
         df = clean_data(df)
         
-        # 3. Impute
+        # 3. Property Identification
+        df = create_property_id(df)
+        
+        # 4. Deduplicate (TRUE duplicates only)
+        df = deduplicate(df)
+        
+        # 5. Sales History
+        df = enrich_sales_history(df)
+        
+        # 6. Segmentation
+        df = assign_segments(df)
+        df = assign_price_tiers(df)
+        
+        # 7. Imputation
         df = impute_missing_values(df)
         
-        # 4. Enrich
+        # 8. Feature Engineering
         df = feature_engineering(df)
         
-        # 5. Load
-        # First ensure tables exist
+        # 9. Load
         create_tables()
         load_to_postgres(df)
         
+        # Summary
         logger.info("=" * 60)
         logger.info("ETL Pipeline Completed Successfully")
         logger.info("=" * 60)
+        logger.info(f"Final record count: {len(df):,}")
+        logger.info(f"Unique properties: {df['property_id'].nunique():,}")
+        logger.info(f"Properties with history: {(df['sale_sequence'] > 1).sum():,}")
         
     except Exception as e:
         logger.error(f"ETL Failed: {e}")
         raise
+
 
 if __name__ == "__main__":
     run_etl()

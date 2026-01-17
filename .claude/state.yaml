@@ -1,16 +1,19 @@
 # S.P.E.C. NYC Project State
 # Minimal pointer - the real source of truth is NYC_IMPLEMENTATION_PLAN.md checkboxes
 
-current_phase: "1.6"
-phase_name: "Feature Engineering"
+current_phase: "1.5"
+phase_name: "Data Cleaning & Enrichment"
 status: "in_progress"  # not_started | in_progress | complete
 last_updated: "2026-01-17"
 blocking: null
-last_milestone: "Phase 1.5 complete - 290,996 cleaned records loaded to PostgreSQL"
+last_milestone: "ETL v2 designed with property identification, sales history, and segmentation"
 
-# Data acquisition summary:
-# - Source: NYC Annualized Sales API (w2pb-icbu)
-# - Records: 498,666 (2019-2024)
-# - Coordinate coverage: 97.4%
-# - Cache: data/raw/annualized_sales_2019_2025.csv
-# - Decision log: docs/DATA_SOURCES_DECISION_LOG.md
+# Data Model Design (2026-01-17):
+# - property_id: BBL + apartment for unique identification
+# - Sales history: sale_sequence, is_latest_sale, price_change_pct
+# - Segmentation: SINGLE_FAMILY, WALKUP, ELEVATOR, SMALL_MULTI
+# - Price tiers: entry, core, premium, luxury (within-segment)
+#
+# Model Strategy (per Zillow/Redfin research):
+# - V1.0: Single global model with segment features
+# - V2.0: Segment-specific models if variance >15%

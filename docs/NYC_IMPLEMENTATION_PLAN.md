@@ -101,43 +101,117 @@ SPEC-NYC/
 - Coverage: 97.4% have coordinates
 - Cache: `data/raw/annualized_sales_2019_2025.csv`
 
-### 1.5 Data Cleaning ✅
+### 1.5 Data Cleaning & Enrichment
 
-- [x] Create `src/etl.py` with cleaning rules:
-  - Filter `sale_price == 0` (family transfers)
-  - Filter `sale_price < 10000` (non-market)
-  - Filter commercial building classes
-  - Handle missing sqft (impute from building class median)
-  - Remove duplicates (keep most recent per BBL)
-- [x] Log cleaning statistics (records removed, reasons)
-- [x] Save cleaned data to PostgreSQL
+**Filtering Rules:**
+- [ ] Filter `sale_price < 10000` (family transfers, non-market)
+- [ ] Filter non-residential building classes
+- [ ] Filter missing coordinates (cannot map)
+- [ ] Filter missing BBL (no property identifier)
 
-**ETL Results (2025-01-17)**:
-- Raw records: 498,666
-- After cleaning: 290,996 (58% retention)
-- All records in PostgreSQL `sales` table
+**Property Identification (NEW):**
+- [ ] Create `property_id` = BBL + apartment_number (for condos/co-ops)
+- [ ] Keep ALL legitimate resales (same property, different dates)
+- [ ] Remove only TRUE duplicates (same property_id + date + price)
 
-### 1.6 Feature Engineering
+**Sales History Enrichment (NEW):**
+- [ ] `sale_sequence`: 1st, 2nd, 3rd sale of this property in dataset
+- [ ] `is_latest_sale`: Boolean flag for most recent sale per property
+- [ ] `previous_sale_price`: For appreciation calculation
+- [ ] `previous_sale_date`: For holding period analysis
+- [ ] `price_change_pct`: (current - previous) / previous
 
-- [x] ~~Port `src/spatial.py` from SF project~~ (integrated into ETL)
-- [x] Update city center coordinates to Manhattan (40.7831, -73.9712)
-- [x] Compute features:
-  - `distance_to_center_km` ✓
-  - `h3_index` (resolution 8) ✓
-  - `h3_price_lag` (median price in hex neighbors) - *deferred to model training*
-- [ ] Create feature matrix for model training
+**Missing Value Imputation:**
+- [ ] `gross_square_feet`: Hierarchical median (neighborhood+class → borough+class → class → citywide)
+- [ ] `year_built`: Hierarchical median (neighborhood → borough → citywide)
+- [ ] Track all imputations with `_imputed` flags
+- [ ] Document in `docs/DATA_QUALITY_LOG.md`
 
-### 1.7 Model Training
+### 1.6 Property Segmentation (NEW)
 
-- [ ] Port `src/model.py` from SF project
+**Segment Classification:**
+```
+Segment          | Building Classes | Est. Records | Key Characteristics
+─────────────────┼──────────────────┼──────────────┼────────────────────
+SINGLE_FAMILY    | 01, 02, 03       | ~80K         | Houses, standalone
+WALKUP           | 07, 09, 12       | ~30K         | No elevator apts
+ELEVATOR         | 08, 10, 13       | ~150K        | Doorman buildings
+SMALL_MULTI      | 14, 15, 16, 17   | ~20K         | 2-10 unit buildings
+```
+
+- [ ] Add `property_segment` column based on building_class
+- [ ] Add `price_tier` column (within-segment quartile: entry/core/premium/luxury)
+- [ ] Validate segment distribution
+
+### 1.7 Feature Engineering
+
+**Spatial Features:**
+- [x] `distance_to_center_km` - Distance to Manhattan (40.7831, -73.9712)
+- [x] `h3_index` - Uber H3 hex at resolution 8
+- [ ] `h3_price_lag` - Median price in neighboring hexes (computed at training time)
+
+**Time Features:**
+- [ ] `sale_month`, `sale_quarter` - Seasonality
+- [ ] `days_on_market` - If available from listing data
+
+**Derived Features:**
+- [ ] `building_age` = current_year - year_built
+- [ ] `price_per_sqft` = sale_price / gross_square_feet (for comps, not training)
+
+### 1.8 Model Training (Global + Segment Features)
+
+**V1.0 Approach: Single Global Model with Segment Features**
+
+Per industry research (Zillow, Redfin), we start with ONE model that learns segments implicitly:
+
+```python
+NUMERIC_FEATURES = [
+    'gross_square_feet', 'year_built', 'building_age',
+    'residential_units', 'total_units',
+    'distance_to_center_km', 'h3_price_lag'
+]
+
+CATEGORICAL_FEATURES = [
+    'borough',              # 5 categories
+    'building_class',       # ~48 categories
+    'property_segment',     # 4 categories (NEW)
+    'price_tier',           # 4 categories (NEW)
+    'neighborhood',         # ~250 categories (or use H3)
+]
+```
+
 - [ ] Train XGBoost with Optuna (50 trials)
-- [ ] Features:
-  - sqft, year_built, units_total (from PLUTO)
-  - building_class, borough (categorical)
-  - h3_price_lag, distance_to_center_km (spatial)
-- [ ] Evaluate: PPE10, MdAPE, R²
+- [ ] Evaluate OVERALL: PPE10, MdAPE, R²
+- [ ] Evaluate BY SEGMENT: PPE10 per property_segment
+- [ ] If segment variance >15%, flag for V2.0 segment-specific models
 - [ ] Save model to `models/` directory
-- [ ] Log to MLflow
+- [ ] Log metrics to MLflow
+
+### 1.9 Dashboard
+
+- [ ] Port `app.py` from SF project
+- [ ] Update for NYC:
+  - Map centered on Manhattan
+  - Borough and segment filters
+  - Show `is_latest_sale` properties by default
+  - Click for full price history
+- [ ] Display:
+  - Property map with valuation status (color by over/under valued)
+  - SHAP waterfall chart
+  - Property details + sales history
+- [ ] Test: Application runs without errors
+
+### 1.10 V1.0 Deliverables Checklist
+
+- [ ] Docker Compose works (`docker-compose up`)
+- [ ] PostgreSQL contains cleaned, segmented NYC data
+- [ ] All imputation documented in DATA_QUALITY_LOG.md
+- [ ] Global model achieves ≥70% PPE10 overall
+- [ ] Per-segment PPE10 logged and analyzed
+- [ ] SHAP explanations display correctly
+- [ ] Map shows properties with price history on click
+- [ ] README documents data sources, segmentation, and metrics
+- [ ] Git tag: `v1.0`
 
 ### 1.8 Dashboard
 
@@ -164,72 +238,94 @@ SPEC-NYC/
 
 ---
 
-## Phase 2: Probabilistic Intelligence (V2.0)
+## Phase 2: Segment-Specific Models (V2.0)
 
-### 2.1 Quantile Regression
+### 2.1 Segment Performance Analysis
 
-- [ ] Update `src/model.py` to train quantile models
-- [ ] Train three XGBoost models:
+If V1.0 shows >15% PPE10 variance between segments, train segment-specific models:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                     PROPERTY ROUTER                          │
+│  (Route based on property_segment + price_tier)             │
+└─────────────────────────────────────────────────────────────┘
+                              │
+        ┌─────────────────────┼─────────────────────┐
+        ▼                     ▼                     ▼
+┌───────────────┐     ┌───────────────┐     ┌───────────────┐
+│ SINGLE_FAMILY │     │   ELEVATOR    │     │    WALKUP     │
+│    MODEL      │     │    MODEL      │     │    MODEL      │
+└───────────────┘     └───────────────┘     └───────────────┘
+```
+
+- [ ] Analyze V1.0 per-segment performance
+- [ ] Identify segments with poor accuracy (PPE10 <65%)
+- [ ] Train dedicated model for underperforming segments
+- [ ] Compare: segment model vs global model per segment
+
+### 2.2 Quantile Regression (Uncertainty)
+
+- [ ] Train quantile models for confidence intervals:
   - `model_q10`: 10th percentile (lower bound)
   - `model_q50`: 50th percentile (point estimate)
   - `model_q90`: 90th percentile (upper bound)
 - [ ] Use `objective='reg:quantileerror'` with `quantile_alpha`
-- [ ] Prediction output format:
+- [ ] Prediction output:
 ```python
 {
     "point_estimate": 1_250_000,
-    "confidence_80": [lower_q10, upper_q90],
+    "confidence_80": [1_050_000, 1_480_000],
+    "segment": "ELEVATOR",
+    "model_used": "segment_elevator_v2"
 }
 ```
 
-### 2.2 NYC Spatial Features
+### 2.3 NYC Spatial Features
 
 - [ ] Download MTA subway station data
 - [ ] Add feature: `subway_distance_m` (distance to nearest station)
 - [ ] Download FEMA flood zone data (if available)
 - [ ] Add feature: `flood_zone` (boolean or category)
-- [ ] Retrain model with new features
-- [ ] Evaluate improvement in metrics
+- [ ] Retrain models with new features
+- [ ] Evaluate improvement by segment
 
-### 2.3 Backtesting Dashboard
+### 2.4 Temporal Backtesting
 
 - [ ] Create `src/backtest.py`:
-  - Train on 2018-2022 data
-  - Predict 2023 sales
-  - Compare predictions vs actuals
+  - Train on 2019-2022 data
+  - Predict 2023-2024 sales
+  - Compare predictions vs actuals BY SEGMENT
 - [ ] Add dashboard section:
-  - "2023 Backtest Results"
-  - PPE10 on holdout year
-  - Scatter plot: predicted vs actual
-- [ ] Target: ≥70% PPE10 on backtest
+  - "Backtest Results" with segment breakdown
+  - PPE10 on holdout years
+  - Scatter plot: predicted vs actual (colored by segment)
+- [ ] Target: ≥70% PPE10 on backtest for each segment
 
-### 2.4 Comparable Sales
+### 2.5 Comparable Sales
 
 - [ ] Create `src/comps.py`:
-  - Find 5 most similar sales
+  - Find 5 most similar sales within SAME SEGMENT
   - Similarity based on: neighborhood, sqft (±20%), building class
   - Within last 12 months
 - [ ] Add dashboard section: "Comparable Sales"
 - [ ] Display: address, sale price, date, sqft, similarity score
+- [ ] Show appreciation trends for resold properties
 
-### 2.5 Borough Expansion
+### 2.6 Price History & Appreciation
 
-- [ ] If Manhattan/Brooklyn PPE10 ≥75%:
-  - Add Queens data
-  - Add Bronx data
-  - Add Staten Island data
-- [ ] Retrain model on all 5 boroughs
-- [ ] Evaluate per-borough accuracy
-- [ ] Consider cascading model if accuracy drops significantly
+- [ ] Dashboard widget: "Price History" for properties with multiple sales
+- [ ] Calculate appreciation rate by neighborhood/segment
+- [ ] "Hot Spots" map: neighborhoods with highest appreciation
 
-### 2.6 V2.0 Deliverables Checklist
+### 2.7 V2.0 Deliverables Checklist
 
+- [ ] Segment-specific models trained (if needed)
 - [ ] Confidence intervals displayed in UI
 - [ ] Subway distance feature integrated
-- [ ] Backtesting dashboard functional
-- [ ] Comparable sales table works
-- [ ] All 5 boroughs supported (if feasible)
-- [ ] PPE10 ≥75%, MdAPE ≤8%
+- [ ] Backtesting by segment functional
+- [ ] Comparable sales within segment
+- [ ] Price history visible for resold properties
+- [ ] PPE10 ≥75% per segment, MdAPE ≤8%
 - [ ] Git tag: `v2.0`
 
 ---
