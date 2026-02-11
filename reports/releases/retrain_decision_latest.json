@@ -1,0 +1,18 @@
+{
+  "should_retrain": true,
+  "decision": "retrain",
+  "reasons": [
+    "drift alerts exceed policy (3 > 0)"
+  ],
+  "policy": {
+    "max_model_age_days": 90,
+    "min_ppe10": 0.75,
+    "max_mdape": 0.08,
+    "max_drift_alerts": 0
+  },
+  "signals": {
+    "drift_alerts": 3,
+    "performance_status": "ok",
+    "model_age_days": 0
+  }
+}

@@ -118,4 +118,13 @@ from dotenv import load_dotenv
 load_dotenv()
 
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://spec:spec_password@localhost:5432/spec_nyc")
+DATABASE_PATH = os.getenv("DATABASE_PATH", str(DATA_PROCESSED / "spec_nyc.sqlite3"))
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
+
+# ============================================================================
+# AI SECURITY / BUDGET CONTROLS
+# ============================================================================
+AI_AUDIT_BACKEND = os.getenv("AI_AUDIT_BACKEND", "postgres")  # postgres | sqlite
+AI_DAILY_COST_LIMIT_USD = float(os.getenv("AI_DAILY_COST_LIMIT_USD", "25.0"))
+AI_REQUEST_COST_LIMIT_USD = float(os.getenv("AI_REQUEST_COST_LIMIT_USD", "2.0"))
+AI_MAX_OUTPUT_TOKENS = int(os.getenv("AI_MAX_OUTPUT_TOKENS", "1200"))

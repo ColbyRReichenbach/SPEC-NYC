@@ -47,6 +47,7 @@ data/raw/
 *.parquet
 *.csv
 !data/.gitkeep
+!reports/**/*.csv
 
 # ----- IDE & OS -----
 .idea/
@@ -77,12 +78,13 @@ mlruns/
 mlartifacts/
 
 # ----- Tests (Not needed in production) -----
-tests/
 .pytest_cache/
 .coverage
 htmlcov/
 .tox/
 .nox/
+!tests/
+!tests/**/*.py
 
 # ----- Vector Databases & Embeddings -----
 data/vector_db/
@@ -100,3 +102,8 @@ chroma_db/
 *.pt
 *.pth
 *.safetensors
+
+# ----- Local Smoke Artifacts -----
+models/*smoke*
+reports/**/*smoke*
+reports/validation/smoke_inputs/

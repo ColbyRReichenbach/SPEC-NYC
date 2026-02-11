@@ -25,7 +25,7 @@ This document provides full transparency on all data quality issues, transformat
 | **API Endpoint** | `w2pb-icbu` |
 | **Date Range** | 2019-2024 |
 | **Raw Records** | 498,666 |
-| **Download Date** | 2026-01-16 |
+| **Download Date** | 2026-02-10 |
 
 ---
 
@@ -40,11 +40,11 @@ Raw Data (498,666)
     │
     ├─► Filter: Missing coordinates ───────► -4,198 records (cannot map)
     │
-    ├─► Filter: Missing BBL ───────────────► -1,117 records (no property ID)
+    ├─► Filter: Missing/invalid BBL ───────► -2,238 records (missing or zero BBL)
     │
-    ├─► Deduplicate (BBL + date + price) ──► -6,042 records (exact duplicates)
+    ├─► Deduplicate (BBL + date + price) ──► -2,201 records (exact duplicates)
     │
-    └─► Final Dataset: 290,996 records (58.3% retention)
+    └─► Final Dataset: 293,716 records (58.9% retention)
 ```
 
 ---
@@ -97,21 +97,21 @@ Raw Data (498,666)
 
 **Rationale**: BBL is the canonical NYC property identifier; required for deduplication
 
-**Impact**: -1,117 records (0.2%)
+**Impact**: -2,238 records (0.4%)
 
 ---
 
 ## Missing Value Analysis
 
-### Audit Date: 2026-01-17
+### Audit Date: 2026-02-11
 
 | Feature | Total | NULL | Zero | Valid (>0) | Valid % | Root Cause |
 |---------|-------|------|------|------------|---------|------------|
-| `gross_square_feet` | 290,996 | 151,107 | 0 | 139,889 | **48.1%** | Co-ops/Condos don't report unit sqft |
-| `land_square_feet` | 290,996 | 132,608 | 18,787 | 139,601 | 48.0% | Same as above |
-| `year_built` | 290,996 | 0 | 12,358 | 278,638 | 95.8% | Some properties have no build year |
-| `residential_units` | 290,996 | 82,968 | 1,196 | 206,832 | 71.1% | Unit sales don't report building totals |
-| `total_units` | 290,996 | 82,968 | 1,192 | 206,836 | 71.1% | Same as above |
+| `gross_square_feet` | 293,716 | 0 | 0 | 293,716 | **100.0%** | Missing values imputed hierarchically |
+| `land_square_feet` | 293,716 | 133,928 | 18,950 | 140,838 | 47.9% | Not required for V1 model |
+| `year_built` | 293,716 | 0 | 0 | 293,716 | 100.0% | Missing values imputed hierarchically |
+| `residential_units` | 293,716 | 84,046 | 1,210 | 208,460 | 71.0% | Unit sales don't report building totals |
+| `total_units` | 293,716 | 84,046 | 1,206 | 208,464 | 71.0% | Same as above |
 
 ### Root Cause Analysis: `gross_square_feet`
 
@@ -185,14 +185,16 @@ Raw Data (498,666)
 
 ## Data Quality Metrics
 
-### After ETL Pipeline (v1 - 2026-01-17)
+### After ETL Pipeline (v1 - 2026-02-11)
 
 | Metric | Value |
 |--------|-------|
-| Total records | 290,996 |
-| Records with valid sqft | 139,889 (48.1%) |
-| Records with imputed sqft | 0 (PENDING) |
-| Records with valid year_built | 278,638 (95.8%) |
+| Total records | 293,716 |
+| Records with imputed sqft | 153,824 (52.4%) |
+| Sqft imputation level distribution | neighborhood_class: 60,818; borough_class: 7,932; class_only: 9; citywide: 85,065 |
+| Records with imputed year_built | 13,096 (4.5%) |
+| Records with valid sqft | 293,716 (100.0%) |
+| Records with valid year_built | 293,716 (100.0%) |
 | Geographic coverage | 100% (all have lat/lon) |
 | H3 index coverage | 100% |
 | Borough coverage | All 5 boroughs |
@@ -208,7 +210,7 @@ Raw Data (498,666)
 
 3. **Commercial Exclusion**: Mixed-use properties with commercial components are excluded if building class is commercial-primary.
 
-4. **Temporal Bias**: 2020) sales may reflect COVID-related market distortions.
+4. **Temporal Bias**: 2020 sales may reflect COVID-related market distortions.
 
 ---
 
@@ -221,8 +223,9 @@ Raw Data (498,666)
 | 2026-01-17 | 0.3 | Added H3 spatial index and distance_to_center features | ETL Pipeline |
 | 2026-01-17 | - | Created data quality documentation | Data Engineer |
 | 2026-01-17 | - | RCA: Identified co-op/condo sqft issue as data source limitation | Data Engineer |
-| 2026-01-17 | 0.4 | PENDING: Implement proper imputation with documentation | - |
+| 2026-02-11 | 0.4 | Implemented hierarchical sqft/year_built imputation with tracking flags | Data Engineer |
+| 2026-02-11 | 0.5 | Updated ETL outputs after dropping invalid BBL (zero BBL) and rerunning full load | Data Engineer |
 
 ---
 
-*Last Updated: 2026-01-17*
+*Last Updated: 2026-02-11*

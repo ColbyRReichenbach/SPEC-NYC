@@ -90,6 +90,10 @@ def create_session() -> requests.Session:
         "User-Agent": "SPEC-NYC-Valuation-Model/1.0 (Educational Project)",
         "Accept": "text/csv"
     })
+    # Optional Socrata app token for higher API reliability/rate limits.
+    app_token = os.getenv("SOCRATA_APP_TOKEN", "").strip()
+    if app_token:
+        session.headers["X-App-Token"] = app_token
     
     return session
 

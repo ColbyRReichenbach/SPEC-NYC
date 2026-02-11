@@ -1,0 +1,84 @@
+{
+  "overall": {
+    "n": 120,
+    "ppe10": 0.875,
+    "mdape": 0.038905592748656195,
+    "r2": 0.795727692803823
+  },
+  "per_segment": {
+    "ELEVATOR": {
+      "n": 43,
+      "ppe10": 0.8837209302325582,
+      "mdape": 0.040014426868920164,
+      "r2": 0.7695812136397755
+    },
+    "SINGLE_FAMILY": {
+      "n": 43,
+      "ppe10": 0.8604651162790697,
+      "mdape": 0.027104999869429536,
+      "r2": 0.7365154739556163
+    },
+    "SMALL_MULTI": {
+      "n": 17,
+      "ppe10": 1.0,
+      "mdape": 0.04042111303410192,
+      "r2": 0.7991769426924109
+    },
+    "WALKUP": {
+      "n": 17,
+      "ppe10": 0.7647058823529411,
+      "mdape": 0.051144361975945116,
+      "r2": 0.860541953833928
+    }
+  },
+  "per_price_tier": {
+    "core": {
+      "n": 28,
+      "ppe10": 0.8928571428571429,
+      "mdape": 0.032301541005587686,
+      "r2": 0.7313924924483268
+    },
+    "entry": {
+      "n": 28,
+      "ppe10": 0.8214285714285714,
+      "mdape": 0.04999139975311875,
+      "r2": 0.6895382617899808
+    },
+    "luxury": {
+      "n": 30,
+      "ppe10": 0.9,
+      "mdape": 0.03498639185020617,
+      "r2": 0.7698136480984082
+    },
+    "premium": {
+      "n": 34,
+      "ppe10": 0.8823529411764706,
+      "mdape": 0.04156655031941821,
+      "r2": 0.6822948261680215
+    }
+  },
+  "metadata": {
+    "model_version": "v1",
+    "trained_at_utc": "2026-02-11T00:36:11.702604",
+    "train_rows": 480,
+    "test_rows": 120,
+    "feature_columns": [
+      "gross_square_feet",
+      "year_built",
+      "building_age",
+      "residential_units",
+      "total_units",
+      "distance_to_center_km",
+      "h3_price_lag",
+      "borough",
+      "building_class",
+      "property_segment",
+      "price_tier",
+      "neighborhood"
+    ],
+    "optuna_trials": 0,
+    "best_params": {},
+    "segment_ppe10_variance": 0.23529411764705888,
+    "segment_variance_flag_v2": true
+  }
+}

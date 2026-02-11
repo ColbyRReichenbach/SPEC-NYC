@@ -18,11 +18,14 @@ import json
 import hashlib
 import logging
 import sqlite3
-from datetime import datetime
+import re
+from datetime import datetime, timedelta
 from typing import Dict, Any, Optional, List
 from pathlib import Path
 from functools import wraps
 import time
+
+from sqlalchemy import text
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -185,7 +188,11 @@ def estimate_cost(input_tokens: int, output_tokens: int, model: str) -> float:
     return input_cost + output_cost
 
 
-def validate_request_budget(prompt: str, model: str) -> tuple[bool, str]:
+def validate_request_budget(
+    prompt: str,
+    model: str,
+    max_output_tokens: Optional[int] = None,
+) -> tuple[bool, str]:
     """
     Check if request is within token budget.
     
@@ -196,14 +203,27 @@ def validate_request_budget(prompt: str, model: str) -> tuple[bool, str]:
     Returns:
         Tuple of (is_valid, reason).
     """
+    from config.settings import AI_MAX_OUTPUT_TOKENS, AI_REQUEST_COST_LIMIT_USD
+
     token_count = count_tokens(prompt, model)
     limits = get_model_limits(model)
     max_input = limits["input"]
+    output_budget = min(max_output_tokens or AI_MAX_OUTPUT_TOKENS, limits["output"])
     
     if token_count > max_input:
         return False, f"Prompt exceeds token limit: {token_count} > {max_input}"
-    
-    return True, f"OK ({token_count}/{max_input} tokens)"
+
+    est_cost = estimate_cost(token_count, output_budget, model)
+    if est_cost > AI_REQUEST_COST_LIMIT_USD:
+        return False, (
+            f"Estimated request cost ${est_cost:.4f} exceeds per-request limit "
+            f"${AI_REQUEST_COST_LIMIT_USD:.4f}"
+        )
+
+    return True, (
+        f"OK ({token_count}/{max_input} tokens, est_cost=${est_cost:.4f}, "
+        f"req_limit=${AI_REQUEST_COST_LIMIT_USD:.4f})"
+    )
 
 
 # ====================================
@@ -296,17 +316,16 @@ def _sanitize_value(value: Any) -> Any:
     if isinstance(value, str):
         # Remove potential injection patterns
         dangerous_patterns = [
-            "ignore previous",
-            "ignore all",
-            "disregard",
-            "system prompt",
-            "reveal your instructions",
-            "forget everything",
+            r"ignore\s+previous",
+            r"ignore\s+all",
+            r"disregard",
+            r"system\s+prompt",
+            r"reveal\s+your\s+instructions",
+            r"forget\s+everything",
         ]
         sanitized = value
         for pattern in dangerous_patterns:
-            if pattern.lower() in sanitized.lower():
-                sanitized = sanitized.replace(pattern, "[REDACTED]")
+            sanitized = re.sub(pattern, "[REDACTED]", sanitized, flags=re.IGNORECASE)
         return sanitized
     elif isinstance(value, dict):
         return {k: _sanitize_value(v) for k, v in value.items()}
@@ -540,18 +559,63 @@ def retry_with_exponential_backoff(
 # ====================================
 # 3E.7: SECURITY LOGGING & AUDIT
 # ====================================
-def _get_db_connection() -> sqlite3.Connection:
-    """Get database connection for audit logging."""
+def _get_audit_backend() -> str:
+    """Resolve audit backend from settings."""
+    try:
+        from config.settings import AI_AUDIT_BACKEND
+        backend = str(AI_AUDIT_BACKEND).strip().lower()
+        if backend in {"postgres", "sqlite"}:
+            return backend
+    except Exception:
+        pass
+    return "sqlite"
+
+
+def _get_sqlite_connection() -> sqlite3.Connection:
+    """Get SQLite connection for audit logging fallback."""
     from config.settings import DATABASE_PATH
-    return sqlite3.connect(DATABASE_PATH)
+    db_path = Path(DATABASE_PATH)
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+    return sqlite3.connect(db_path)
+
+
+def _get_postgres_engine():
+    """Get SQLAlchemy engine for Postgres audit logging."""
+    from src.database import engine as pg_engine
+    return pg_engine
 
 
 def init_audit_table() -> None:
     """Initialize the AI audit log table if it doesn't exist."""
     try:
-        conn = _get_db_connection()
+        backend = _get_audit_backend()
+        if backend == "postgres":
+            try:
+                engine = _get_postgres_engine()
+                with engine.begin() as conn:
+                    conn.execute(text("""
+                        CREATE TABLE IF NOT EXISTS ai_audit_log (
+                            id BIGSERIAL PRIMARY KEY,
+                            timestamp TIMESTAMP NOT NULL,
+                            property_id BIGINT,
+                            prompt_hash VARCHAR(64),
+                            model VARCHAR(100),
+                            input_tokens INTEGER,
+                            output_tokens INTEGER,
+                            cost_estimate DOUBLE PRECISION,
+                            success BOOLEAN,
+                            error_message TEXT,
+                            latency_ms INTEGER
+                        )
+                    """))
+                    conn.execute(text("CREATE INDEX IF NOT EXISTS ix_ai_audit_log_timestamp ON ai_audit_log (timestamp)"))
+                logger.debug("AI audit table initialized (postgres)")
+                return
+            except Exception as pg_exc:
+                logger.warning("Postgres audit init failed; falling back to sqlite: %s", pg_exc)
+
+        conn = _get_sqlite_connection()
         cursor = conn.cursor()
-        
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS ai_audit_log (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -567,7 +631,6 @@ def init_audit_table() -> None:
                 latency_ms INTEGER
             )
         """)
-        
         conn.commit()
         conn.close()
         logger.debug("AI audit table initialized")
@@ -610,12 +673,42 @@ def log_ai_interaction(
     - Usage pattern analysis
     """
     try:
-        conn = _get_db_connection()
+        backend = _get_audit_backend()
+        if backend == "postgres":
+            try:
+                engine = _get_postgres_engine()
+                with engine.begin() as conn:
+                    conn.execute(
+                        text("""
+                            INSERT INTO ai_audit_log
+                            (timestamp, property_id, prompt_hash, model, input_tokens,
+                             output_tokens, cost_estimate, success, error_message, latency_ms)
+                            VALUES
+                            (:timestamp, :property_id, :prompt_hash, :model, :input_tokens,
+                             :output_tokens, :cost_estimate, :success, :error_message, :latency_ms)
+                        """),
+                        {
+                            "timestamp": datetime.utcnow(),
+                            "property_id": property_id,
+                            "prompt_hash": prompt_hash,
+                            "model": model,
+                            "input_tokens": input_tokens,
+                            "output_tokens": output_tokens,
+                            "cost_estimate": cost_estimate,
+                            "success": success,
+                            "error_message": error_message,
+                            "latency_ms": latency_ms,
+                        },
+                    )
+                return
+            except Exception as pg_exc:
+                logger.warning("Postgres audit insert failed; falling back to sqlite: %s", pg_exc)
+
+        conn = _get_sqlite_connection()
         cursor = conn.cursor()
-        
         cursor.execute("""
-            INSERT INTO ai_audit_log 
-            (timestamp, property_id, prompt_hash, model, input_tokens, 
+            INSERT INTO ai_audit_log
+            (timestamp, property_id, prompt_hash, model, input_tokens,
              output_tokens, cost_estimate, success, error_message, latency_ms)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
@@ -630,7 +723,6 @@ def log_ai_interaction(
             error_message,
             latency_ms,
         ))
-        
         conn.commit()
         conn.close()
         
@@ -641,21 +733,28 @@ def log_ai_interaction(
 def get_daily_ai_costs() -> float:
     """Get total AI costs for today."""
     try:
-        conn = _get_db_connection()
+        backend = _get_audit_backend()
+        if backend == "postgres":
+            try:
+                engine = _get_postgres_engine()
+                with engine.begin() as conn:
+                    result = conn.execute(
+                        text("SELECT COALESCE(SUM(cost_estimate), 0) FROM ai_audit_log WHERE DATE(timestamp) = CURRENT_DATE")
+                    ).scalar_one()
+                return float(result or 0.0)
+            except Exception as pg_exc:
+                logger.warning("Postgres daily cost query failed; falling back to sqlite: %s", pg_exc)
+        conn = _get_sqlite_connection()
         cursor = conn.cursor()
-        
         today = datetime.utcnow().date().isoformat()
-        
         cursor.execute("""
-            SELECT SUM(cost_estimate) 
-            FROM ai_audit_log 
+            SELECT SUM(cost_estimate)
+            FROM ai_audit_log
             WHERE DATE(timestamp) = ?
         """, (today,))
-        
         result = cursor.fetchone()[0]
         conn.close()
-        
-        return result or 0.0
+        return float(result or 0.0)
         
     except Exception as e:
         logger.error(f"Failed to get daily costs: {e}")
@@ -670,23 +769,59 @@ def get_ai_usage_stats(days: int = 7) -> Dict[str, Any]:
         Dict with total_calls, success_rate, total_cost, avg_latency.
     """
     try:
-        conn = _get_db_connection()
-        cursor = conn.cursor()
-        
-        cursor.execute("""
-            SELECT 
-                COUNT(*) as total_calls,
-                SUM(CASE WHEN success = 1 THEN 1 ELSE 0 END) as successful_calls,
-                SUM(cost_estimate) as total_cost,
-                AVG(latency_ms) as avg_latency,
-                SUM(input_tokens) as total_input_tokens,
-                SUM(output_tokens) as total_output_tokens
-            FROM ai_audit_log 
-            WHERE timestamp >= datetime('now', ?)
-        """, (f"-{days} days",))
-        
-        row = cursor.fetchone()
-        conn.close()
+        since = datetime.utcnow() - timedelta(days=days)
+        backend = _get_audit_backend()
+        if backend == "postgres":
+            try:
+                engine = _get_postgres_engine()
+                with engine.begin() as conn:
+                    row = conn.execute(
+                        text("""
+                            SELECT
+                                COUNT(*) as total_calls,
+                                SUM(CASE WHEN success THEN 1 ELSE 0 END) as successful_calls,
+                                COALESCE(SUM(cost_estimate), 0) as total_cost,
+                                COALESCE(AVG(latency_ms), 0) as avg_latency,
+                                COALESCE(SUM(input_tokens), 0) as total_input_tokens,
+                                COALESCE(SUM(output_tokens), 0) as total_output_tokens
+                            FROM ai_audit_log
+                            WHERE timestamp >= :since
+                        """),
+                        {"since": since},
+                    ).one()
+            except Exception as pg_exc:
+                logger.warning("Postgres usage stats query failed; falling back to sqlite: %s", pg_exc)
+                conn = _get_sqlite_connection()
+                cursor = conn.cursor()
+                cursor.execute("""
+                    SELECT
+                        COUNT(*) as total_calls,
+                        SUM(CASE WHEN success = 1 THEN 1 ELSE 0 END) as successful_calls,
+                        SUM(cost_estimate) as total_cost,
+                        AVG(latency_ms) as avg_latency,
+                        SUM(input_tokens) as total_input_tokens,
+                        SUM(output_tokens) as total_output_tokens
+                    FROM ai_audit_log
+                    WHERE timestamp >= ?
+                """, (since.isoformat(),))
+                row = cursor.fetchone()
+                conn.close()
+        else:
+            conn = _get_sqlite_connection()
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT
+                    COUNT(*) as total_calls,
+                    SUM(CASE WHEN success = 1 THEN 1 ELSE 0 END) as successful_calls,
+                    SUM(cost_estimate) as total_cost,
+                    AVG(latency_ms) as avg_latency,
+                    SUM(input_tokens) as total_input_tokens,
+                    SUM(output_tokens) as total_output_tokens
+                FROM ai_audit_log
+                WHERE timestamp >= ?
+            """, (since.isoformat(),))
+            row = cursor.fetchone()
+            conn.close()
         
         if row and row[0] > 0:
             return {
@@ -741,13 +876,25 @@ def secure_ai_call(
         Tuple of (response_text, metadata_dict) or (None, error_dict).
     """
     import openai
+    from config.settings import AI_DAILY_COST_LIMIT_USD, AI_MAX_OUTPUT_TOKENS
     
     start_time = time.time()
     prompt_hash = hash_prompt(prompt)
     input_tokens = count_tokens(prompt, model)
     
-    # Validate budget
-    is_valid, reason = validate_request_budget(prompt, model)
+    # Enforce output budget hard cap (model + app config)
+    model_limits = get_model_limits(model)
+    safe_max_tokens = min(max_tokens, model_limits["output"], AI_MAX_OUTPUT_TOKENS)
+    if safe_max_tokens < max_tokens:
+        logger.warning(
+            "Reducing max_tokens from %s to %s to satisfy model/app limits.",
+            max_tokens,
+            safe_max_tokens,
+        )
+    max_tokens = safe_max_tokens
+
+    # Validate request budget
+    is_valid, reason = validate_request_budget(prompt, model, max_output_tokens=max_tokens)
     if not is_valid:
         log_ai_interaction(
             property_id=property_id,
@@ -758,6 +905,25 @@ def secure_ai_call(
             error_message=reason,
         )
         return None, {"error": reason, "type": "validation_error"}
+
+    est_request_cost = estimate_cost(input_tokens, max_tokens, model)
+    today_cost = get_daily_ai_costs()
+    if (today_cost + est_request_cost) > AI_DAILY_COST_LIMIT_USD:
+        reason = (
+            f"Daily AI budget exceeded: today=${today_cost:.4f}, "
+            f"request_est=${est_request_cost:.4f}, "
+            f"limit=${AI_DAILY_COST_LIMIT_USD:.4f}"
+        )
+        log_ai_interaction(
+            property_id=property_id,
+            prompt_hash=prompt_hash,
+            model=model,
+            input_tokens=input_tokens,
+            cost_estimate=est_request_cost,
+            success=False,
+            error_message=reason,
+        )
+        return None, {"error": reason, "type": "budget_error"}
     
     try:
         client = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
@@ -790,6 +956,8 @@ def secure_ai_call(
             "input_tokens": input_tokens,
             "output_tokens": output_tokens,
             "cost": cost,
+            "request_estimated_cost": est_request_cost,
+            "daily_cost_before_call": today_cost,
             "latency_ms": latency_ms,
             "model": model,
         }
@@ -811,5 +979,6 @@ def secure_ai_call(
         return None, {"error": error_msg, "type": type(e).__name__}
 
 
-# Initialize audit table on module load
-init_audit_table()
+# Initialize audit table on module load (opt-out for tests)
+if os.getenv("SPEC_SKIP_AUDIT_INIT", "0") != "1":
+    init_audit_table()

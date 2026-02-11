@@ -1,0 +1,5 @@
+stage,rows,unique_properties,latest_sale_date
+extract_raw,220,,2025-08-08
+cleaned,220,,2025-08-08
+feature_engineered,220,220.0,2025-08-08
+load_skipped_dry_run,220,220.0,2025-08-08

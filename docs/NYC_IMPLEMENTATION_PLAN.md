@@ -15,6 +15,27 @@ This document serves as the master workflow for building S.P.E.C.-NYC, a product
 - MdAPE (median error): ≤8%
 - R²: ≥0.75
 
+## Definition of Done (DoD) Gates
+
+Each phase is complete only when its gate is green with evidence artifacts:
+
+- **Gate A (Data Foundation)**:
+  - ETL data contracts pass with zero critical violations
+  - `tests/test_etl.py` passes
+  - ETL run artifacts exist in `reports/data/`
+- **Gate B (Model Baseline)**:
+  - Reproducible training run produces model + metrics artifacts
+  - Overall and per-segment scorecards generated
+- **Gate C (Product Experience)**:
+  - Dashboard loads live KPI/valuation/explainability outputs
+  - Core user journey works end-to-end (data -> prediction -> explanation)
+- **Gate D (Operations)**:
+  - MLflow tracking wired for params/metrics/artifacts/tags
+  - Drift + performance monitor scripts generate outputs
+- **Gate E (Release)**:
+  - Validator readiness report is all-green
+  - Release checklist complete and tag created
+
 ---
 
 ## Data Sources
@@ -155,7 +176,7 @@ SMALL_MULTI      | 14, 15, 16, 17   | 15,555       | 2-10 unit buildings
 **Spatial Features:**
 - [x] `distance_to_center_km` - Distance to Manhattan (40.7831, -73.9712)
 - [x] `h3_index` - Uber H3 hex at resolution 8
-- [ ] `h3_price_lag` - Median price in neighboring hexes (computed at training time)
+- [x] `h3_price_lag` - Median price in neighboring hexes (computed at training time)
 
 **Time Features:**
 - [x] `sale_month`, `sale_quarter` - Seasonality
@@ -187,61 +208,38 @@ CATEGORICAL_FEATURES = [
 ]
 ```
 
-- [ ] Train XGBoost with Optuna (50 trials)
-- [ ] Evaluate OVERALL: PPE10, MdAPE, R²
-- [ ] Evaluate BY SEGMENT: PPE10 per property_segment
-- [ ] If segment variance >15%, flag for V2.0 segment-specific models
-- [ ] Save model to `models/` directory
-- [ ] Log metrics to MLflow
+- [x] Train XGBoost with Optuna tuning path (trials configurable via CLI)
+- [x] Evaluate OVERALL: PPE10, MdAPE, R²
+- [x] Evaluate BY SEGMENT: PPE10 per property_segment
+- [x] If segment variance >15%, flag for V2.0 segment-specific models
+- [x] Save model to `models/` directory
+- [x] Log metrics to MLflow
 
 ### 1.9 Dashboard
 
-- [ ] Port `app.py` from SF project
-- [ ] Update for NYC:
+- [x] Port `app.py` from SF project
+- [x] Update for NYC:
   - Map centered on Manhattan
   - Borough and segment filters
   - Show `is_latest_sale` properties by default
   - Click for full price history
-- [ ] Display:
+- [x] Display:
   - Property map with valuation status (color by over/under valued)
   - SHAP waterfall chart
   - Property details + sales history
-- [ ] Test: Application runs without errors
+- [x] Test: Application runs without errors
 
 ### 1.10 V1.0 Deliverables Checklist
 
 - [ ] Docker Compose works (`docker-compose up`)
-- [ ] PostgreSQL contains cleaned, segmented NYC data
-- [ ] All imputation documented in DATA_QUALITY_LOG.md
-- [ ] Global model achieves ≥70% PPE10 overall
-- [ ] Per-segment PPE10 logged and analyzed
-- [ ] SHAP explanations display correctly
-- [ ] Map shows properties with price history on click
-- [ ] README documents data sources, segmentation, and metrics
-- [ ] Git tag: `v1.0`
-
-### 1.8 Dashboard
-
-- [ ] Port `app.py` from SF project
-- [ ] Update for NYC:
-  - Map centered on Manhattan
-  - Borough filter (Manhattan, Brooklyn)
-  - NYC-specific styling
-- [ ] Display:
-  - Property map with valuation status
-  - SHAP waterfall chart
-  - Basic property details
-- [ ] Test: Application runs without errors
-
-### 1.9 V1.0 Deliverables Checklist
-
-- [ ] Docker Compose works (`docker-compose up`)
-- [ ] PostgreSQL contains cleaned NYC data
-- [ ] Model achieves ≥70% PPE10
-- [ ] SHAP explanations display correctly
-- [ ] Map shows Manhattan/Brooklyn properties
-- [ ] README documents data sources and metrics
-- [ ] Git tag: `v1.0`
+- [x] PostgreSQL contains cleaned, segmented NYC data
+- [x] All imputation documented in DATA_QUALITY_LOG.md
+- [x] Global model achieves ≥70% PPE10 overall
+- [x] Per-segment PPE10 logged and analyzed
+- [x] SHAP explanations display correctly
+- [x] Map shows properties with price history on click
+- [x] README documents data sources, segmentation, and metrics
+- [x] Git tag: `v1.0`
 
 ---
 

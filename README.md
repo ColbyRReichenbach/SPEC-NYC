@@ -51,8 +51,62 @@ open http://localhost:8501
 
 | Dataset | Source | Purpose |
 |---------|--------|---------|
-| Rolling Sales | [NYC Finance](https://www.nyc.gov/site/finance/taxes/property-rolling-sales-data.page) | Transaction prices |
-| PLUTO | [NYC Planning](https://www.nyc.gov/site/planning/data-maps/open-data/dwn-pluto-mappluto.page) | Building characteristics |
+| Annualized Sales (`w2pb-icbu`) | [NYC Open Data](https://data.cityofnewyork.us/resource/w2pb-icbu) | Primary sales dataset (includes lat/lon + BBL) |
+| MTA Subway Stations | [data.ny.gov](https://data.ny.gov/Transportation/MTA-Subway-Stations/39hk-dx4f) | Transit proximity features (planned) |
+
+As of **February 10, 2026**, the Annualized Sales API range is `2016-01-01` to `2024-12-31`.
+
+See `docs/DATA_SOURCES_DECISION_LOG.md` for source-selection rationale.
+
+---
+
+## Data Bootstrap (Real NYC Data)
+
+```bash
+# Canonical bootstrap (download + db + idempotent ETL load)
+./scripts/bootstrap_data.sh
+```
+
+Useful variants:
+
+```bash
+# Dry-run ETL only (no DB load)
+./scripts/bootstrap_data.sh --dry-run
+
+# Reuse already-downloaded raw file and already-running DB
+./scripts/bootstrap_data.sh --skip-download --skip-db-start
+
+# Smaller pull window for quick validation
+./scripts/bootstrap_data.sh --start-year 2024 --end-year 2024
+```
+
+Expected outputs:
+- Raw file: `data/raw/annualized_sales_2019_2025.csv`
+- ETL report: `reports/data/etl_run_YYYYMMDD.md`
+- Postgres table: `sales` populated with cleaned/segmented rows
+
+Optional:
+- Set `SOCRATA_APP_TOKEN` in `.env` to improve API reliability on large pulls.
+
+---
+
+## V1 Baseline Snapshot
+
+Data snapshot (latest ETL):
+- Cleaned + loaded rows: `293,716`
+- Date range: `2019-01-01` to `2024-12-31`
+- Segments: `SINGLE_FAMILY`, `ELEVATOR`, `WALKUP`, `SMALL_MULTI`
+
+Model baseline (`models/metrics_v1.json`):
+- Overall PPE10: `87.5%`
+- Overall MdAPE: `3.89%`
+- Overall R2: `0.796`
+- Segment PPE10: `ELEVATOR 88.37%`, `SINGLE_FAMILY 86.05%`, `SMALL_MULTI 100.00%`, `WALKUP 76.47%`
+
+Artifacts:
+- Metrics: `models/metrics_v1.json`
+- Segment scorecard: `reports/model/segment_scorecard_v1.csv`
+- SHAP plots: `reports/model/shap_summary_v1.png`, `reports/model/shap_waterfall_v1.png`
 
 ---
 

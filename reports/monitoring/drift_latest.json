@@ -1,0 +1,8 @@
+{
+  "status": "alert",
+  "rows": 7,
+  "alerts": 3,
+  "warnings": 4,
+  "reference_csv": "reports/monitoring/reference_slice_v1.csv",
+  "current_csv": "reports/monitoring/current_slice_v1.csv"
+}

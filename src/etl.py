@@ -17,14 +17,18 @@ Usage:
 See docs/DATA_QUALITY_LOG.md for transformation documentation.
 """
 
+import argparse
 import logging
-import pandas as pd
-import numpy as np
-import h3
 from datetime import datetime
 from pathlib import Path
 
-from src.database import get_session, engine, Sales, create_tables
+import h3
+import numpy as np
+import pandas as pd
+from sqlalchemy import text
+
+from src.database import Sales, create_tables, get_session
+from src.validation.data_contracts import DataContractResult, validate_data_contracts
 
 # Configure logging
 logging.basicConfig(
@@ -38,6 +42,7 @@ logger = logging.getLogger(__name__)
 # =============================================================================
 
 RAW_DATA_PATH = Path("data/raw/annualized_sales_2019_2025.csv")
+REPORTS_DATA_DIR = Path("reports/data")
 CURRENT_YEAR = 2025  # For building_age calculation
 
 # NYC Center (Manhattan - Columbus Circle)
@@ -65,6 +70,31 @@ SEGMENT_MAPPING = {
     "15": "SMALL_MULTI",     # Condos - 2-10 Unit Residential
     "16": "SMALL_MULTI",     # Condos - 2-10 Unit with Commercial
     "17": "SMALL_MULTI",     # Condo Coops
+}
+
+RAW_CONTRACT_REQUIRED_COLUMNS = [
+    "sale_date",
+    "sale_price",
+    "bbl",
+    "latitude",
+    "longitude",
+    "borough",
+    "block",
+    "lot",
+    "building_class_category",
+]
+
+POST_ETL_NULL_THRESHOLDS = {
+    "sale_date": 0.0,
+    "sale_price": 0.0,
+    "bbl": 0.0,
+    "latitude": 0.0,
+    "longitude": 0.0,
+    "property_id": 0.0,
+    "property_segment": 0.0,
+    "price_tier": 0.0,
+    "gross_square_feet": 0.0,
+    "year_built": 0.0,
 }
 
 
@@ -134,10 +164,13 @@ def clean_data(df: pd.DataFrame) -> pd.DataFrame:
     df = df.dropna(subset=['latitude', 'longitude'])
     logger.info(f"Filtered missing coordinates: -> {len(df):,} records")
     
-    # 6. Filter: Must have BBL
+    # 6. Filter: Must have valid BBL
     df = df.dropna(subset=['bbl'])
+    df['bbl'] = pd.to_numeric(df['bbl'], errors='coerce')
+    df = df[df['bbl'].notna()]
     df['bbl'] = df['bbl'].astype('int64')
-    logger.info(f"Filtered missing BBL: -> {len(df):,} records")
+    df = df[df['bbl'] > 0]
+    logger.info(f"Filtered missing/invalid BBL: -> {len(df):,} records")
     
     # 7. Parse dates
     df['sale_date'] = pd.to_datetime(df['sale_date'])
@@ -292,14 +325,24 @@ def assign_price_tiers(df: pd.DataFrame) -> pd.DataFrame:
     """
     logger.info("Assigning price tiers within segments...")
     
-    def tier_func(x):
-        q = pd.qcut(x, q=4, labels=['entry', 'core', 'premium', 'luxury'], duplicates='drop')
-        return q
-    
+    tier_labels = ['entry', 'core', 'premium', 'luxury']
+
+    def _segment_tiers(x: pd.Series) -> pd.Series:
+        ranked = x.rank(method='first')
+        try:
+            return pd.qcut(ranked, q=4, labels=tier_labels, duplicates='drop')
+        except ValueError:
+            # Fallback for tiny segments (e.g., deterministic dry-run with --limit).
+            pct = (ranked - 1) / max(len(ranked) - 1, 1)
+            return pd.cut(
+                pct,
+                bins=[-0.001, 0.25, 0.50, 0.75, 1.00],
+                labels=tier_labels,
+                include_lowest=True,
+            )
+
     # Compute quartiles within each segment
-    df['price_tier'] = df.groupby('property_segment')['sale_price'].transform(
-        lambda x: pd.qcut(x.rank(method='first'), q=4, labels=['entry', 'core', 'premium', 'luxury'])
-    )
+    df['price_tier'] = df.groupby('property_segment')['sale_price'].transform(_segment_tiers)
     
     # Show tier distribution
     tier_counts = df['price_tier'].value_counts()
@@ -484,7 +527,7 @@ def feature_engineering(df: pd.DataFrame) -> pd.DataFrame:
 # 8. LOADING
 # =============================================================================
 
-def load_to_postgres(df: pd.DataFrame):
+def load_to_postgres(df: pd.DataFrame, *, replace_existing: bool = False):
     """Insert processed data into PostgreSQL."""
     logger.info("Loading data to PostgreSQL...")
     
@@ -494,6 +537,11 @@ def load_to_postgres(df: pd.DataFrame):
     valid_columns = {c.key for c in Sales.__table__.columns}
     
     try:
+        if replace_existing:
+            logger.info("replace_existing=True: truncating 'sales' table before load")
+            session.execute(text("TRUNCATE TABLE sales RESTART IDENTITY"))
+            session.commit()
+
         count = 0
         batch_size = 5000
         
@@ -527,45 +575,158 @@ def load_to_postgres(df: pd.DataFrame):
 
 
 # =============================================================================
+# 9. REPORTING
+# =============================================================================
+
+def _record_stage(stage_stats: list[dict], stage_name: str, df: pd.DataFrame) -> None:
+    """Capture row and quality counters for ETL stage reporting."""
+    stage_stats.append(
+        {
+            "stage": stage_name,
+            "rows": len(df),
+            "unique_properties": int(df["property_id"].nunique()) if "property_id" in df.columns else None,
+            "latest_sale_date": str(pd.to_datetime(df["sale_date"], errors="coerce").max().date())
+            if "sale_date" in df.columns and len(df) > 0
+            else None,
+        }
+    )
+
+
+def _write_etl_report(
+    run_started_at: datetime,
+    input_path: Path,
+    dry_run: bool,
+    stage_stats: list[dict],
+    contract_results: list[tuple[str, DataContractResult]],
+) -> tuple[Path, Path]:
+    """
+    Write ETL run artifacts:
+    - reports/data/etl_run_YYYYMMDD.md
+    - reports/data/etl_run_YYYYMMDD.csv
+    """
+    REPORTS_DATA_DIR.mkdir(parents=True, exist_ok=True)
+
+    run_stamp = run_started_at.strftime("%Y%m%d")
+    markdown_path = REPORTS_DATA_DIR / f"etl_run_{run_stamp}.md"
+    csv_path = REPORTS_DATA_DIR / f"etl_run_{run_stamp}.csv"
+
+    stage_df = pd.DataFrame(stage_stats)
+    stage_df.to_csv(csv_path, index=False)
+
+    contract_lines = []
+    for label, result in contract_results:
+        contract_lines.append(f"- **{label}**: {'PASS' if result.passed else 'FAIL'}")
+        if result.violations:
+            for violation in result.violations:
+                contract_lines.append(
+                    f"  - [{violation.check}] {violation.message} (failed_rows={violation.failed_rows})"
+                )
+
+    stage_table = stage_df.to_string(index=False) if not stage_df.empty else "No stage stats captured."
+
+    md = [
+        f"# ETL Run Report - {run_stamp}",
+        "",
+        "## Run Metadata",
+        f"- Started (UTC): {run_started_at.isoformat()}",
+        f"- Input: `{input_path}`",
+        f"- Dry run: `{dry_run}`",
+        "",
+        "## Stage Summary",
+        "```text",
+        stage_table,
+        "```",
+        "",
+        "## Data Contract Results",
+    ]
+    if contract_lines:
+        md.extend(contract_lines)
+    else:
+        md.append("_No contract results captured._")
+
+    markdown_path.write_text("\n".join(md), encoding="utf-8")
+    return markdown_path, csv_path
+
+
+# =============================================================================
 # MAIN PIPELINE
 # =============================================================================
 
-def run_etl():
+def run_etl(
+    input_path: Path = RAW_DATA_PATH,
+    limit: int | None = None,
+    dry_run: bool = False,
+    write_report: bool = False,
+    replace_sales: bool = False,
+) -> pd.DataFrame:
     """Execute the full ETL pipeline."""
     logger.info("=" * 60)
     logger.info("S.P.E.C. NYC ETL Pipeline v2")
     logger.info("=" * 60)
-    
+
+    run_started_at = datetime.utcnow()
+    stage_stats: list[dict] = []
+    contract_results: list[tuple[str, DataContractResult]] = []
+
     try:
         # 1. Extract
-        df = load_raw_data(RAW_DATA_PATH)
-        
+        df = load_raw_data(input_path)
+        if limit is not None:
+            df = df.head(limit).copy()
+            logger.info(f"Applied deterministic row limit: {limit:,}")
+        _record_stage(stage_stats, "extract_raw", df)
+
         # 2. Clean
         df = clean_data(df)
-        
+        _record_stage(stage_stats, "cleaned", df)
+
+        clean_contract = validate_data_contracts(
+            df,
+            required_columns=RAW_CONTRACT_REQUIRED_COLUMNS,
+            max_freshness_days=730,
+            raise_on_error=True,
+        )
+        contract_results.append(("post-clean", clean_contract))
+        logger.info("Data contracts (post-clean): PASS")
+
         # 3. Property Identification
         df = create_property_id(df)
-        
+
         # 4. Deduplicate (TRUE duplicates only)
         df = deduplicate(df)
-        
+
         # 5. Sales History
         df = enrich_sales_history(df)
-        
+
         # 6. Segmentation
         df = assign_segments(df)
         df = assign_price_tiers(df)
-        
+
         # 7. Imputation
         df = impute_missing_values(df)
-        
+
         # 8. Feature Engineering
         df = feature_engineering(df)
-        
+        _record_stage(stage_stats, "feature_engineered", df)
+
+        final_contract = validate_data_contracts(
+            df,
+            null_thresholds=POST_ETL_NULL_THRESHOLDS,
+            max_freshness_days=730,
+            raise_on_error=True,
+        )
+        contract_results.append(("post-feature-engineering", final_contract))
+        logger.info("Data contracts (post-feature-engineering): PASS")
+
         # 9. Load
-        create_tables()
-        load_to_postgres(df)
-        
+        if dry_run:
+            logger.info("Dry run enabled: skipping PostgreSQL load.")
+            _record_stage(stage_stats, "load_skipped_dry_run", df)
+        else:
+            create_tables()
+            load_to_postgres(df, replace_existing=replace_sales)
+            _record_stage(stage_stats, "loaded_postgres", df)
+
         # Summary
         logger.info("=" * 60)
         logger.info("ETL Pipeline Completed Successfully")
@@ -573,11 +734,73 @@ def run_etl():
         logger.info(f"Final record count: {len(df):,}")
         logger.info(f"Unique properties: {df['property_id'].nunique():,}")
         logger.info(f"Properties with history: {(df['sale_sequence'] > 1).sum():,}")
-        
+
+        if write_report:
+            markdown_path, csv_path = _write_etl_report(
+                run_started_at=run_started_at,
+                input_path=input_path,
+                dry_run=dry_run,
+                stage_stats=stage_stats,
+                contract_results=contract_results,
+            )
+            logger.info(f"Wrote ETL report: {markdown_path}")
+            logger.info(f"Wrote ETL CSV summary: {csv_path}")
+
+        return df
+
     except Exception as e:
         logger.error(f"ETL Failed: {e}")
+        if write_report and stage_stats:
+            try:
+                markdown_path, csv_path = _write_etl_report(
+                    run_started_at=run_started_at,
+                    input_path=input_path,
+                    dry_run=dry_run,
+                    stage_stats=stage_stats,
+                    contract_results=contract_results,
+                )
+                logger.info(f"Partial ETL report written: {markdown_path}")
+                logger.info(f"Partial ETL CSV written: {csv_path}")
+            except Exception as report_error:
+                logger.error(f"Failed to write partial ETL report: {report_error}")
         raise
 
 
 if __name__ == "__main__":
-    run_etl()
+    parser = argparse.ArgumentParser(description="Run S.P.E.C. NYC ETL pipeline")
+    parser.add_argument(
+        "--input",
+        type=Path,
+        default=RAW_DATA_PATH,
+        help=f"Input CSV path (default: {RAW_DATA_PATH})",
+    )
+    parser.add_argument(
+        "--limit",
+        type=int,
+        default=None,
+        help="Optional deterministic row limit (applied before transformation)",
+    )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Run full transformation and contracts without loading to PostgreSQL",
+    )
+    parser.add_argument(
+        "--write-report",
+        action="store_true",
+        help="Write reports/data/etl_run_YYYYMMDD.md and CSV stage summary",
+    )
+    parser.add_argument(
+        "--replace-sales",
+        action="store_true",
+        help="Truncate the sales table before load to ensure idempotent full refreshes",
+    )
+    args = parser.parse_args()
+
+    run_etl(
+        input_path=args.input,
+        limit=args.limit,
+        dry_run=args.dry_run,
+        write_report=args.write_report,
+        replace_sales=args.replace_sales,
+    )
