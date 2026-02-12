@@ -19,6 +19,7 @@ See docs/DATA_QUALITY_LOG.md for transformation documentation.
 
 import argparse
 import logging
+import re
 from datetime import datetime
 from pathlib import Path
 
@@ -188,47 +189,165 @@ def clean_data(df: pd.DataFrame) -> pd.DataFrame:
 # 3. PROPERTY IDENTIFICATION
 # =============================================================================
 
+_INVALID_UNIT_TOKENS = {
+    "STREET", "ST", "AVENUE", "AVE", "ROAD", "RD", "BOULEVARD", "BLVD",
+    "PLACE", "PL", "LANE", "LN", "DRIVE", "DR", "COURT", "CT", "TERRACE",
+    "TER", "PARKWAY", "PKWY", "WAY", "NORTH", "SOUTH", "EAST", "WEST",
+}
+
+_EXPLICIT_UNIT_SUFFIX_RE = re.compile(r"(?:APT|APARTMENT|UNIT|#)\s*([A-Z0-9\-]+)\s*$", re.IGNORECASE)
+
+
+def _normalize_unit_token(value: object, *, strict: bool) -> str | None:
+    """Normalize apartment/unit tokens for stable property IDs."""
+    if pd.isna(value):
+        return None
+
+    token = str(value).strip().upper()
+    if token in {"", "NAN", "NONE", "NULL"}:
+        return None
+
+    token = re.sub(r"^(APT|APARTMENT|UNIT)\s*", "", token)
+    token = token.lstrip("#").strip()
+    token = re.sub(r"\s+", "", token)
+    token = re.sub(r"[^A-Z0-9\-]", "", token)
+
+    if not token or token in _INVALID_UNIT_TOKENS:
+        return None
+
+    if strict:
+        has_unit_signal = bool(re.search(r"\d", token) or token.startswith("PH"))
+        if not has_unit_signal:
+            return None
+
+    return token
+
+
+def _extract_unit_from_address(address_value: object) -> str | None:
+    """
+    Extract probable unit identifier from address when apartment_number is missing.
+    Common formats include ', 5A', ', PH12A', ', #3B', ', UNIT 2'.
+    """
+    if pd.isna(address_value):
+        return None
+
+    address = str(address_value).strip()
+    if not address:
+        return None
+
+    trailing = re.search(r",\s*([^,]+)\s*$", address)
+    if trailing:
+        token = _normalize_unit_token(trailing.group(1), strict=True)
+        if token:
+            return token
+
+    explicit = _EXPLICIT_UNIT_SUFFIX_RE.search(address)
+    if explicit:
+        return _normalize_unit_token(explicit.group(1), strict=True)
+
+    return None
+
+
 def create_property_id(df: pd.DataFrame) -> pd.DataFrame:
     """
     Create unique property identifier:
     - For single-family: just BBL
-    - For condos/co-ops: BBL + apartment_number
-    
-    This allows tracking resales of the SAME UNIT vs different units in same building.
+    - For condos/co-ops: BBL + unit identifier
+
+    Unit identifier priority:
+    1) apartment_number (if present)
+    2) parsed address suffix (for rows where unit is encoded in address)
     """
-    logger.info("Creating property_id (BBL + apartment where applicable)...")
-    
-    def make_property_id(row):
-        bbl = str(int(row['bbl']))
-        apt = str(row['apartment_number']).strip() if pd.notna(row['apartment_number']) else ''
-        if apt and apt.lower() not in ['nan', '', 'none']:
-            return f"{bbl}_{apt}"
-        return bbl
-    
-    df['property_id'] = df.apply(make_property_id, axis=1)
-    
-    unique_properties = df['property_id'].nunique()
-    logger.info(f"Created {unique_properties:,} unique property IDs from {len(df):,} sales")
-    
-    return df
+    logger.info("Creating property_id (BBL + unit identifier where applicable)...")
+
+    out = df.copy()
+    bbl_text = out['bbl'].astype('int64').astype(str)
+
+    if 'apartment_number' in out.columns:
+        apartment_units = out['apartment_number'].apply(lambda v: _normalize_unit_token(v, strict=False))
+    else:
+        apartment_units = pd.Series([None] * len(out), index=out.index, dtype=object)
+
+    if 'address' in out.columns:
+        address_units = out['address'].apply(_extract_unit_from_address)
+    else:
+        address_units = pd.Series([None] * len(out), index=out.index, dtype=object)
+
+    unit_identifier = apartment_units.where(apartment_units.notna(), address_units)
+    out['unit_identifier'] = unit_identifier
+    out['property_id_source'] = np.select(
+        [apartment_units.notna(), address_units.notna()],
+        ['apartment_number', 'address_suffix'],
+        default='bbl_only',
+    )
+
+    out['property_id'] = bbl_text
+    has_unit = out['unit_identifier'].notna()
+    out.loc[has_unit, 'property_id'] = (
+        bbl_text[has_unit] + '_' + out.loc[has_unit, 'unit_identifier'].astype(str)
+    )
+
+    unique_properties = out['property_id'].nunique()
+    logger.info(f"Created {unique_properties:,} unique property IDs from {len(out):,} sales")
+    logger.info("  ├─ Unit source apartment_number: %s", int((out['property_id_source'] == 'apartment_number').sum()))
+    logger.info("  ├─ Unit source address_suffix: %s", int((out['property_id_source'] == 'address_suffix').sum()))
+    logger.info("  └─ BBL-only IDs: %s", int((out['property_id_source'] == 'bbl_only').sum()))
+
+    return out
+
+
+def _get_dedup_metrics(df: pd.DataFrame) -> tuple[int, int]:
+    """
+    Return (duplicate_groups, suspect_groups) where dedup key repeats.
+    suspect_groups are duplicate key groups containing multiple normalized addresses.
+    """
+    key_cols = ['property_id', 'sale_date', 'sale_price']
+    required = {'address', *key_cols}
+    if not required.issubset(df.columns):
+        return 0, 0
+
+    dup_mask = df.duplicated(subset=key_cols, keep=False)
+    if not bool(dup_mask.any()):
+        return 0, 0
+
+    dup_rows = df.loc[dup_mask, key_cols + ['address']].copy()
+    duplicate_groups = int(len(dup_rows[key_cols].drop_duplicates()))
+
+    dup_rows['address_norm'] = (
+        dup_rows['address']
+        .fillna('')
+        .astype(str)
+        .str.strip()
+        .str.upper()
+    )
+    unique_address_counts = (
+        dup_rows
+        .groupby(key_cols, dropna=False)['address_norm']
+        .nunique()
+    )
+    suspect_groups = int((unique_address_counts > 1).sum())
+    return duplicate_groups, suspect_groups
 
 
 def deduplicate(df: pd.DataFrame) -> pd.DataFrame:
     """
     Remove TRUE duplicates only:
     - Same property_id + same sale_date + same sale_price = duplicate
-    
+
     Keep all legitimate resales (same property, different transactions).
     """
     before = len(df)
-    
+    duplicate_groups_before, suspect_groups_before = _get_dedup_metrics(df)
+
     # Sort by property_id, sale_date, then keep first occurrence of duplicates
     df = df.sort_values(['property_id', 'sale_date', 'sale_price'])
     df = df.drop_duplicates(subset=['property_id', 'sale_date', 'sale_price'], keep='first')
-    
+
     after = len(df)
     logger.info(f"Removed TRUE duplicates: {before:,} -> {after:,} records ({before - after:,} removed)")
-    
+    logger.info(f"  ├─ Duplicate groups (dedup key): {duplicate_groups_before:,}")
+    logger.info(f"  └─ Suspect duplicate groups (multi-address): {suspect_groups_before:,}")
+
     return df
 
 
@@ -598,6 +717,7 @@ def _write_etl_report(
     dry_run: bool,
     stage_stats: list[dict],
     contract_results: list[tuple[str, DataContractResult]],
+    report_tag: str | None = None,
 ) -> tuple[Path, Path]:
     """
     Write ETL run artifacts:
@@ -607,8 +727,10 @@ def _write_etl_report(
     REPORTS_DATA_DIR.mkdir(parents=True, exist_ok=True)
 
     run_stamp = run_started_at.strftime("%Y%m%d")
-    markdown_path = REPORTS_DATA_DIR / f"etl_run_{run_stamp}.md"
-    csv_path = REPORTS_DATA_DIR / f"etl_run_{run_stamp}.csv"
+    normalized_tag = re.sub(r"[^a-zA-Z0-9_\-]", "_", (report_tag or "").strip()).strip("_").lower()
+    artifact_basename = f"etl_run_{run_stamp}_{normalized_tag}" if normalized_tag else f"etl_run_{run_stamp}"
+    markdown_path = REPORTS_DATA_DIR / f"{artifact_basename}.md"
+    csv_path = REPORTS_DATA_DIR / f"{artifact_basename}.csv"
 
     stage_df = pd.DataFrame(stage_stats)
     stage_df.to_csv(csv_path, index=False)
@@ -644,7 +766,18 @@ def _write_etl_report(
     else:
         md.append("_No contract results captured._")
 
-    markdown_path.write_text("\n".join(md), encoding="utf-8")
+    markdown_contents = "\n".join(md)
+    markdown_path.write_text(markdown_contents, encoding="utf-8")
+
+    # Backward compatibility: keep legacy untagged prod path available.
+    if normalized_tag == "prod":
+        legacy_markdown = REPORTS_DATA_DIR / f"etl_run_{run_stamp}.md"
+        legacy_csv = REPORTS_DATA_DIR / f"etl_run_{run_stamp}.csv"
+        if legacy_markdown != markdown_path:
+            legacy_markdown.write_text(markdown_contents, encoding="utf-8")
+        if legacy_csv != csv_path:
+            stage_df.to_csv(legacy_csv, index=False)
+
     return markdown_path, csv_path
 
 
@@ -658,6 +791,7 @@ def run_etl(
     dry_run: bool = False,
     write_report: bool = False,
     replace_sales: bool = False,
+    report_tag: str | None = None,
 ) -> pd.DataFrame:
     """Execute the full ETL pipeline."""
     logger.info("=" * 60)
@@ -736,12 +870,14 @@ def run_etl(
         logger.info(f"Properties with history: {(df['sale_sequence'] > 1).sum():,}")
 
         if write_report:
+            resolved_report_tag = report_tag or ("dryrun" if dry_run else "prod")
             markdown_path, csv_path = _write_etl_report(
                 run_started_at=run_started_at,
                 input_path=input_path,
                 dry_run=dry_run,
                 stage_stats=stage_stats,
                 contract_results=contract_results,
+                report_tag=resolved_report_tag,
             )
             logger.info(f"Wrote ETL report: {markdown_path}")
             logger.info(f"Wrote ETL CSV summary: {csv_path}")
@@ -752,12 +888,14 @@ def run_etl(
         logger.error(f"ETL Failed: {e}")
         if write_report and stage_stats:
             try:
+                resolved_report_tag = report_tag or ("dryrun" if dry_run else "prod")
                 markdown_path, csv_path = _write_etl_report(
                     run_started_at=run_started_at,
                     input_path=input_path,
                     dry_run=dry_run,
                     stage_stats=stage_stats,
                     contract_results=contract_results,
+                    report_tag=resolved_report_tag,
                 )
                 logger.info(f"Partial ETL report written: {markdown_path}")
                 logger.info(f"Partial ETL CSV written: {csv_path}")
@@ -795,6 +933,12 @@ if __name__ == "__main__":
         action="store_true",
         help="Truncate the sales table before load to ensure idempotent full refreshes",
     )
+    parser.add_argument(
+        "--report-tag",
+        type=str,
+        default=None,
+        help="Optional artifact tag suffix for ETL report files (e.g., prod, smoke, w6_smoke)",
+    )
     args = parser.parse_args()
 
     run_etl(
@@ -803,4 +947,5 @@ if __name__ == "__main__":
         dry_run=args.dry_run,
         write_report=args.write_report,
         replace_sales=args.replace_sales,
+        report_tag=args.report_tag,
     )

@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import re
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -24,6 +25,7 @@ from config.settings import MODEL_CONFIG, MODELS_DIR
 from src.database import engine
 from src.evaluate import build_segment_scorecard, evaluate_predictions, mdape, save_metrics
 from src.explain import generate_shap_artifacts
+from src.inference import build_route_keys, predict_dataframe
 from src.mlops.track_run import get_git_sha, log_run
 
 
@@ -31,6 +33,8 @@ logger = logging.getLogger(__name__)
 
 TARGET_COL = "sale_price"
 DATE_COL = "sale_date"
+MODEL_STRATEGIES = {"global", "segmented_router"}
+ROUTER_MODES = {"segment_only", "segment_plus_tier"}
 
 NUMERIC_FEATURES = [
     "gross_square_feet",
@@ -46,7 +50,6 @@ CATEGORICAL_FEATURES = [
     "borough",
     "building_class",
     "property_segment",
-    "price_tier",
     "neighborhood",
 ]
 
@@ -63,7 +66,6 @@ BASE_REQUIRED_COLUMNS = [
     "borough",
     "building_class",
     "property_segment",
-    "price_tier",
     "neighborhood",
 ]
 
@@ -71,6 +73,10 @@ BASE_REQUIRED_COLUMNS = [
 @dataclass
 class TrainConfig:
     model_version: str = "v1"
+    artifact_tag: str = "prod"
+    model_strategy: str = "global"
+    router_mode: str = "segment_only"
+    min_segment_rows: int = 2000
     test_size: float = 0.2
     random_state: int = 42
     optuna_trials: int = 0
@@ -80,6 +86,19 @@ class TrainConfig:
     enable_mlflow: bool = True
     dataset_version: str | None = None
     tracking_uri: str | None = None
+
+
+def _normalize_artifact_tag(tag: str | None) -> str:
+    raw = (tag or "").strip().lower()
+    if not raw:
+        return "prod"
+    normalized = re.sub(r"[^a-z0-9_\-]", "_", raw).strip("_")
+    return normalized or "prod"
+
+
+def _artifact_stem(model_version: str, artifact_tag: str) -> str:
+    normalized_tag = _normalize_artifact_tag(artifact_tag)
+    return model_version if normalized_tag == "prod" else f"{model_version}_{normalized_tag}"
 
 
 def load_training_data(input_csv: Path | None = None, limit: int | None = None) -> pd.DataFrame:
@@ -253,27 +272,120 @@ def tune_hyperparameters(train_df: pd.DataFrame, random_state: int, n_trials: in
     return study.best_params
 
 
+def _router_columns_for_mode(router_mode: str) -> list[str]:
+    mode = str(router_mode).strip().lower()
+    if mode == "segment_only":
+        return ["property_segment"]
+    if mode == "segment_plus_tier":
+        return ["property_segment", "price_tier_proxy"]
+    raise ValueError(f"Unsupported router_mode '{router_mode}'. Expected one of {sorted(ROUTER_MODES)}")
+
+
+def _train_segmented_router_models(
+    train_df: pd.DataFrame,
+    *,
+    params: Dict[str, object],
+    random_state: int,
+    min_segment_rows: int,
+    route_keys: pd.Series,
+) -> tuple[Pipeline, Dict[str, Pipeline]]:
+    """Train fallback global model plus segment-specific submodels when data is sufficient."""
+    if len(route_keys) != len(train_df):
+        raise ValueError("route_keys length must match train_df length.")
+
+    x_train = train_df[NUMERIC_FEATURES + CATEGORICAL_FEATURES]
+    y_train = train_df[TARGET_COL]
+
+    fallback_pipeline = build_pipeline(params, random_state=random_state)
+    fallback_pipeline.fit(x_train, y_train)
+
+    segment_pipelines: Dict[str, Pipeline] = {}
+    routed_train = train_df.copy()
+    routed_train["_route_key"] = route_keys.astype(str).values
+    for route_key, seg_df in routed_train.groupby("_route_key"):
+        route_name = str(route_key)
+        if len(seg_df) < min_segment_rows:
+            logger.info(
+                "Skipping segment submodel for route=%s (rows=%s < min_segment_rows=%s)",
+                route_name,
+                len(seg_df),
+                min_segment_rows,
+            )
+            continue
+        seg_pipeline = build_pipeline(params, random_state=random_state)
+        seg_pipeline.fit(
+            seg_df[NUMERIC_FEATURES + CATEGORICAL_FEATURES],
+            seg_df[TARGET_COL],
+        )
+        segment_pipelines[route_name] = seg_pipeline
+        logger.info("Trained segment submodel for route=%s (rows=%s)", route_name, len(seg_df))
+
+    return fallback_pipeline, segment_pipelines
+
+
 def train_model(df: pd.DataFrame, config: TrainConfig) -> dict:
     """Train baseline model, evaluate, and persist W2 artifacts."""
+    strategy = str(config.model_strategy).strip().lower()
+    if strategy not in MODEL_STRATEGIES:
+        raise ValueError(f"Unsupported model strategy '{config.model_strategy}'. Expected one of {sorted(MODEL_STRATEGIES)}")
+    router_mode = str(config.router_mode).strip().lower()
+    if router_mode not in ROUTER_MODES:
+        raise ValueError(f"Unsupported router_mode '{config.router_mode}'. Expected one of {sorted(ROUTER_MODES)}")
+    if config.min_segment_rows < 1:
+        raise ValueError("min_segment_rows must be >= 1")
+
     frame = prepare_training_frame(df)
     train_df, test_df = time_split(frame, config.test_size)
     train_df, test_df = add_h3_price_lag(train_df, test_df)
 
     best_params = tune_hyperparameters(train_df, config.random_state, config.optuna_trials)
-    pipeline = build_pipeline(best_params, random_state=config.random_state)
 
-    x_train = train_df[NUMERIC_FEATURES + CATEGORICAL_FEATURES]
-    y_train = train_df[TARGET_COL]
-    x_test = test_df[NUMERIC_FEATURES + CATEGORICAL_FEATURES]
-
-    logger.info("Training baseline XGBoost model on %s rows", len(train_df))
-    pipeline.fit(x_train, y_train)
-    preds = pipeline.predict(x_test)
+    logger.info("Training strategy '%s' on %s rows", strategy, len(train_df))
+    if strategy == "segmented_router":
+        router_columns = _router_columns_for_mode(router_mode)
+        missing_router_cols = [c for c in router_columns if c not in train_df.columns]
+        if missing_router_cols:
+            if router_mode == "segment_plus_tier" and "price_tier_proxy" in missing_router_cols and "price_tier" in train_df.columns:
+                raise ValueError(
+                    "router_mode=segment_plus_tier requires non-leaky 'price_tier_proxy' column. "
+                    "Found target-derived 'price_tier' only, which is disallowed for routing."
+                )
+            raise ValueError(f"Training data missing router columns for mode '{router_mode}': {missing_router_cols}")
+        train_route_keys = build_route_keys(train_df, router_columns)
+        fallback_pipeline, segment_pipelines = _train_segmented_router_models(
+            train_df,
+            params=best_params,
+            random_state=config.random_state,
+            min_segment_rows=config.min_segment_rows,
+            route_keys=train_route_keys,
+        )
+    else:
+        router_columns = ["property_segment"]
+        fallback_pipeline = build_pipeline(best_params, random_state=config.random_state)
+        x_train = train_df[NUMERIC_FEATURES + CATEGORICAL_FEATURES]
+        y_train = train_df[TARGET_COL]
+        fallback_pipeline.fit(x_train, y_train)
+        segment_pipelines = {}
 
     eval_df = test_df.copy()
+    prediction_artifact = {
+        "model_strategy": strategy,
+        "feature_columns": NUMERIC_FEATURES + CATEGORICAL_FEATURES,
+        "fallback_pipeline": fallback_pipeline,
+        "segment_pipelines": segment_pipelines,
+        "router_mode": router_mode,
+        "router_columns": router_columns,
+        "router_column": router_columns[0],  # backward compatibility
+        "pipeline": fallback_pipeline,  # backward compatibility
+    }
+    preds, routes = predict_dataframe(prediction_artifact, eval_df)
     eval_df["predicted_price"] = preds
+    eval_df["model_route"] = routes.values
     eval_df["prediction_error"] = eval_df["predicted_price"] - eval_df[TARGET_COL]
     eval_df["abs_pct_error"] = np.abs(eval_df["prediction_error"] / eval_df[TARGET_COL])
+
+    artifact_tag = _normalize_artifact_tag(config.artifact_tag)
+    artifact_stem = _artifact_stem(config.model_version, artifact_tag)
 
     metrics = evaluate_predictions(eval_df)
     segment_scores = [v["ppe10"] for v in metrics.get("per_segment", {}).values() if isinstance(v, dict) and "ppe10" in v]
@@ -281,9 +393,15 @@ def train_model(df: pd.DataFrame, config: TrainConfig) -> dict:
     segment_variance_flag_v2 = bool(segment_ppe10_variance > 0.15)
     metrics["metadata"] = {
         "model_version": config.model_version,
+        "artifact_tag": artifact_tag,
         "trained_at_utc": datetime.utcnow().isoformat(),
         "train_rows": int(len(train_df)),
         "test_rows": int(len(test_df)),
+        "model_strategy": strategy,
+        "router_mode": router_mode,
+        "router_columns": router_columns,
+        "min_segment_rows": int(config.min_segment_rows),
+        "segment_model_count": int(len(segment_pipelines)),
         "feature_columns": NUMERIC_FEATURES + CATEGORICAL_FEATURES,
         "optuna_trials": int(config.optuna_trials),
         "best_params": best_params,
@@ -297,17 +415,25 @@ def train_model(df: pd.DataFrame, config: TrainConfig) -> dict:
     report_dir = Path("reports/model")
     report_dir.mkdir(parents=True, exist_ok=True)
 
-    model_path = MODELS_DIR / f"model_{config.model_version}.joblib"
-    metrics_path = MODELS_DIR / f"metrics_{config.model_version}.json"
-    scorecard_path = report_dir / f"segment_scorecard_{config.model_version}.csv"
-    predictions_path = report_dir / f"evaluation_predictions_{config.model_version}.csv"
+    model_path = MODELS_DIR / f"model_{artifact_stem}.joblib"
+    metrics_path = MODELS_DIR / f"metrics_{artifact_stem}.json"
+    scorecard_path = report_dir / f"segment_scorecard_{artifact_stem}.csv"
+    predictions_path = report_dir / f"evaluation_predictions_{artifact_stem}.csv"
 
     artifact = {
-        "pipeline": pipeline,
+        "pipeline": fallback_pipeline,  # backward compatibility with legacy readers
+        "fallback_pipeline": fallback_pipeline,
+        "segment_pipelines": segment_pipelines,
+        "router_mode": router_mode,
+        "router_columns": router_columns,
+        "router_column": router_columns[0],  # backward compatibility
+        "model_strategy": strategy,
+        "min_segment_rows": int(config.min_segment_rows),
         "feature_columns": NUMERIC_FEATURES + CATEGORICAL_FEATURES,
         "numeric_features": NUMERIC_FEATURES,
         "categorical_features": CATEGORICAL_FEATURES,
         "model_version": config.model_version,
+        "artifact_tag": artifact_tag,
         "trained_at_utc": datetime.utcnow().isoformat(),
     }
     joblib.dump(artifact, model_path)
@@ -325,8 +451,8 @@ def train_model(df: pd.DataFrame, config: TrainConfig) -> dict:
         shap_artifacts = generate_shap_artifacts(
             model_path=model_path,
             evaluation_csv=predictions_path,
-            summary_plot_path=report_dir / f"shap_summary_{config.model_version}.png",
-            waterfall_plot_path=report_dir / f"shap_waterfall_{config.model_version}.png",
+            summary_plot_path=report_dir / f"shap_summary_{artifact_stem}.png",
+            waterfall_plot_path=report_dir / f"shap_waterfall_{artifact_stem}.png",
             sample_size=config.shap_sample_size,
             random_state=config.random_state,
         )
@@ -344,7 +470,7 @@ def train_model(df: pd.DataFrame, config: TrainConfig) -> dict:
                 scorecard_csv=scorecard_path,
                 predictions_csv=predictions_path,
                 experiment_name="spec-nyc-avm",
-                run_name=f"train-{config.model_version}",
+                run_name=f"train-{artifact_stem}",
                 dataset_version=inferred_dataset_version,
                 git_sha=get_git_sha(),
                 tracking_uri=config.tracking_uri,
@@ -358,6 +484,7 @@ def train_model(df: pd.DataFrame, config: TrainConfig) -> dict:
         "metrics_path": str(metrics_path),
         "scorecard_path": str(scorecard_path),
         "predictions_path": str(predictions_path),
+        "artifact_tag": artifact_tag,
         "metrics": metrics,
         "shap_artifacts": shap_artifacts,
         "mlflow": mlflow_result,
@@ -368,9 +495,38 @@ def _cli() -> None:
     parser = argparse.ArgumentParser(description="Train baseline NYC AVM model (W2).")
     parser.add_argument("--input-csv", type=Path, default=None, help="Optional CSV input; defaults to Postgres sales table")
     parser.add_argument("--limit", type=int, default=None, help="Optional row limit for deterministic/dev runs")
+    parser.add_argument(
+        "--strategy",
+        type=str,
+        default="global",
+        choices=sorted(MODEL_STRATEGIES),
+        help="Model training strategy: single global model or segmented router bundle.",
+    )
+    parser.add_argument(
+        "--min-segment-rows",
+        type=int,
+        default=2000,
+        help="Minimum train rows required to train a segment submodel for segmented_router.",
+    )
+    parser.add_argument(
+        "--router-mode",
+        type=str,
+        default="segment_only",
+        choices=sorted(ROUTER_MODES),
+        help=(
+            "Routing key mode for segmented_router strategy. "
+            "segment_plus_tier requires a non-leaky 'price_tier_proxy' column."
+        ),
+    )
     parser.add_argument("--test-size", type=float, default=0.2)
     parser.add_argument("--optuna-trials", type=int, default=0)
     parser.add_argument("--model-version", type=str, default="v1")
+    parser.add_argument(
+        "--artifact-tag",
+        type=str,
+        default="prod",
+        help="Artifact suffix tag. Use 'prod' for canonical paths; non-prod tags append _<tag>.",
+    )
     parser.add_argument("--random-state", type=int, default=42)
     parser.add_argument("--no-shap", action="store_true", help="Disable SHAP artifact generation")
     parser.add_argument("--shap-sample-size", type=int, default=500)
@@ -383,6 +539,10 @@ def _cli() -> None:
 
     config = TrainConfig(
         model_version=args.model_version,
+        artifact_tag=args.artifact_tag,
+        model_strategy=args.strategy,
+        router_mode=args.router_mode,
+        min_segment_rows=args.min_segment_rows,
         test_size=args.test_size,
         random_state=args.random_state,
         optuna_trials=args.optuna_trials,
@@ -404,6 +564,8 @@ def _cli() -> None:
             "segment_scorecard": result["scorecard_path"],
             "predictions": result["predictions_path"],
         },
+        "strategy": args.strategy,
+        "router_mode": args.router_mode,
         "overall_metrics": result["metrics"]["overall"],
     }
     print(json.dumps(summary, indent=2))

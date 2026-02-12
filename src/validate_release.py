@@ -16,6 +16,8 @@ from typing import Dict, Iterable, List, Tuple
 import numpy as np
 import pandas as pd
 
+from src.mlops.arena import load_policy, proposal_is_expired
+
 
 DEFAULT_DB_URL = "postgresql://spec:spec_password@localhost:5433/spec_nyc"
 REPORT_DIR = Path("reports/validation")
@@ -31,6 +33,7 @@ class CheckResult:
     duration_sec: float = 0.0
     log_path: str | None = None
     artifacts: List[str] | None = None
+    evidence_type: str = "smoke"
 
     @property
     def passed(self) -> bool:
@@ -60,6 +63,7 @@ def run_command(
     *,
     timeout_sec: int = 300,
     env_overrides: Dict[str, str] | None = None,
+    evidence_type: str = "smoke",
 ) -> CheckResult:
     started = time.time()
     env = os.environ.copy()
@@ -102,6 +106,7 @@ def run_command(
             command=command,
             duration_sec=duration,
             log_path=str(log_path),
+            evidence_type=evidence_type,
         )
     except subprocess.TimeoutExpired as exc:
         duration = time.time() - started
@@ -128,6 +133,7 @@ def run_command(
             command=command,
             duration_sec=duration,
             log_path=str(log_path),
+            evidence_type=evidence_type,
         )
 
 
@@ -255,8 +261,13 @@ def _build_training_smoke_input(path: Path, rows: int = 800, seed: int = 7) -> P
     return path
 
 
-def run_streamlit_smoke(port: int = 8504, timeout_sec: int = 40) -> CheckResult:
-    name = "streamlit_app_smoke"
+def run_streamlit_smoke(
+    port: int = 8504,
+    timeout_sec: int = 40,
+    *,
+    name: str = "streamlit_app_smoke",
+    evidence_type: str = "smoke",
+) -> CheckResult:
     command = (
         f"python3 -m streamlit run app.py --server.headless true "
         f"--server.address 127.0.0.1 --server.port {port}"
@@ -292,10 +303,17 @@ def run_streamlit_smoke(port: int = 8504, timeout_sec: int = 40) -> CheckResult:
         command=command,
         duration_sec=duration,
         log_path=str(log_path),
+        evidence_type=evidence_type,
     )
 
 
-def check_artifacts(required_paths: Iterable[Path], pattern_paths: Iterable[str]) -> CheckResult:
+def check_artifacts(
+    required_paths: Iterable[Path],
+    pattern_paths: Iterable[str],
+    *,
+    name: str = "artifact_inventory",
+    evidence_type: str = "smoke",
+) -> CheckResult:
     missing = [str(path) for path in required_paths if not path.exists()]
     matched = []
     missing_patterns = []
@@ -315,29 +333,38 @@ def check_artifacts(required_paths: Iterable[Path], pattern_paths: Iterable[str]
     if not detail_parts:
         detail_parts.append("all required artifacts present")
     return CheckResult(
-        name="artifact_inventory",
+        name=name,
         status=status,
         detail="; ".join(detail_parts),
         artifacts=matched + [str(p) for p in required_paths if p.exists()],
+        evidence_type=evidence_type,
     )
 
 
-def evaluate_gates(checks: List[CheckResult]) -> Dict[str, Dict[str, object]]:
+def evaluate_gates(checks: List[CheckResult], *, mode: str = "smoke") -> Dict[str, Dict[str, object]]:
     by_name = {check.name: check for check in checks}
 
-    gate_map = {
-        "Gate A (Data)": [
-            "unit_tests",
-            "docker_compose_config",
-            "docker_compose_up_db",
-            "db_connectivity",
-            "db_schema_create",
-            "etl_smoke",
-        ],
-        "Gate B (Model)": ["model_smoke", "evaluate_smoke", "explain_smoke", "artifact_inventory"],
-        "Gate C (Product)": ["streamlit_app_smoke"],
-        "Gate D (Ops)": ["mlflow_track_smoke", "drift_monitor_smoke", "performance_monitor_smoke", "retrain_policy_smoke"],
-    }
+    if mode == "production":
+        gate_map = {
+            "Gate A (Data)": ["unit_tests", "production_data_evidence"],
+            "Gate B (Model)": ["production_model_evidence", "arena_governance_production"],
+            "Gate C (Product)": ["streamlit_app_production", "production_product_evidence"],
+            "Gate D (Ops)": ["production_ops_evidence"],
+        }
+    else:
+        gate_map = {
+            "Gate A (Data)": [
+                "unit_tests",
+                "docker_compose_config",
+                "docker_compose_up_db",
+                "db_connectivity",
+                "db_schema_create",
+                "etl_smoke",
+            ],
+            "Gate B (Model)": ["model_smoke", "evaluate_smoke", "explain_smoke", "artifact_inventory"],
+            "Gate C (Product)": ["streamlit_app_smoke"],
+            "Gate D (Ops)": ["mlflow_track_smoke", "drift_monitor_smoke", "performance_monitor_smoke", "retrain_policy_smoke"],
+        }
     gate_status: Dict[str, Dict[str, object]] = {}
     for gate_name, required in gate_map.items():
         missing = [name for name in required if name not in by_name]
@@ -371,13 +398,23 @@ def evaluate_gates(checks: List[CheckResult]) -> Dict[str, Dict[str, object]]:
 
 def maybe_tag_release(enabled: bool) -> CheckResult:
     if not enabled:
-        return CheckResult(name="release_tag", status="pass", detail="tagging skipped (--tag-release not set)")
+        return CheckResult(
+            name="release_tag",
+            status="pass",
+            detail="tagging skipped (--tag-release not set)",
+            evidence_type="release",
+        )
 
     has_tag = run_command("release_tag_check_existing", "git tag --list v1.0")
     if has_tag.passed:
         tag_text = Path(has_tag.log_path).read_text(encoding="utf-8")
         if "\nv1.0\n" in f"\n{tag_text}\n":
-            return CheckResult(name="release_tag", status="pass", detail="v1.0 already exists")
+            return CheckResult(
+                name="release_tag",
+                status="pass",
+                detail="v1.0 already exists",
+                evidence_type="release",
+            )
 
     cmd = "git tag -a v1.0 -m \"S.P.E.C. NYC v1.0\""
     tag_result = run_command("release_tag_create", cmd)
@@ -388,8 +425,16 @@ def maybe_tag_release(enabled: bool) -> CheckResult:
             detail=f"failed to create v1.0 tag ({tag_result.detail})",
             command=cmd,
             log_path=tag_result.log_path,
+            evidence_type="release",
         )
-    return CheckResult(name="release_tag", status="pass", detail="created git tag v1.0", command=cmd, log_path=tag_result.log_path)
+    return CheckResult(
+        name="release_tag",
+        status="pass",
+        detail="created git tag v1.0",
+        command=cmd,
+        log_path=tag_result.log_path,
+        evidence_type="release",
+    )
 
 
 def write_report(
@@ -400,11 +445,13 @@ def write_report(
     output_json: Path,
     started_at: datetime,
     finished_at: datetime,
+    validation_mode: str,
 ) -> None:
     output_md.parent.mkdir(parents=True, exist_ok=True)
     output_json.parent.mkdir(parents=True, exist_ok=True)
 
     payload = {
+        "validation_mode": validation_mode,
         "started_at_utc": started_at.isoformat(),
         "finished_at_utc": finished_at.isoformat(),
         "duration_sec": round((finished_at - started_at).total_seconds(), 2),
@@ -416,18 +463,19 @@ def write_report(
     lines = [
         "# S.P.E.C. NYC V1 Readiness Report",
         "",
+        f"- Mode: `{validation_mode}`",
         f"- Started (UTC): `{started_at.isoformat()}`",
         f"- Finished (UTC): `{finished_at.isoformat()}`",
         f"- Duration: `{payload['duration_sec']}s`",
         "",
         "## Checks",
         "",
-        "| Check | Status | Detail | Log |",
-        "|---|---|---|---|",
+        "| Check | Evidence Type | Status | Detail | Log |",
+        "|---|---|---|---|---|",
     ]
     for check in checks:
         lines.append(
-            f"| {check.name} | {check.status} | {check.detail.replace('|', '/')} | "
+            f"| {check.name} | {check.evidence_type} | {check.status} | {check.detail.replace('|', '/')} | "
             f"{check.log_path or '-'} |"
         )
 
@@ -472,21 +520,209 @@ def _prepare_monitoring_inputs(smoke_dir: Path, training_csv: Path) -> Tuple[Pat
     return reference_fallback, current_fallback
 
 
-def run_validation(args: argparse.Namespace) -> int:
-    started_at = datetime.utcnow()
-    REPORT_DIR.mkdir(parents=True, exist_ok=True)
-    LOG_DIR.mkdir(parents=True, exist_ok=True)
-    smoke_dir = REPORT_DIR / "smoke_inputs"
-    smoke_dir.mkdir(parents=True, exist_ok=True)
+def _production_etl_report_check() -> CheckResult:
+    md_files = [Path(p) for p in glob.glob("reports/data/etl_run_*.md")]
+    csv_files = [Path(p) for p in glob.glob("reports/data/etl_run_*.csv")]
 
-    db_env = {"DATABASE_URL": args.database_url}
+    def _is_prod(path: Path) -> bool:
+        name = path.name.lower()
+        return "smoke" not in name and "dryrun" not in name
 
+    prod_md = [p for p in md_files if _is_prod(p)]
+    prod_csv = [p for p in csv_files if _is_prod(p)]
+    if not prod_md or not prod_csv:
+        detail = "missing production ETL reports (*.md/*.csv without smoke/dryrun tags)"
+        return CheckResult(name="production_data_evidence", status="fail", detail=detail, evidence_type="production")
+    return CheckResult(
+        name="production_data_evidence",
+        status="pass",
+        detail=f"found {len(prod_md)} production ETL markdown + {len(prod_csv)} csv reports",
+        artifacts=[str(p) for p in prod_md + prod_csv],
+        evidence_type="production",
+    )
+
+
+def _production_model_evidence_check(min_train_rows: int) -> CheckResult:
+    required_files = [
+        Path("models/model_v1.joblib"),
+        Path("models/metrics_v1.json"),
+        Path("reports/model/segment_scorecard_v1.csv"),
+        Path("reports/model/evaluation_predictions_v1.csv"),
+        Path("reports/model/shap_summary_v1.png"),
+        Path("reports/model/shap_waterfall_v1.png"),
+    ]
+    base = check_artifacts(
+        required_paths=required_files,
+        pattern_paths=[],
+        name="production_model_evidence",
+        evidence_type="production",
+    )
+    if not base.passed:
+        return base
+
+    metrics_path = Path("models/metrics_v1.json")
+    try:
+        payload = json.loads(metrics_path.read_text(encoding="utf-8"))
+        metadata = payload.get("metadata", {})
+        train_rows = int(metadata.get("train_rows") or 0)
+        model_version = str(metadata.get("model_version") or "").strip()
+        artifact_tag = str(metadata.get("artifact_tag") or "").strip().lower()
+    except Exception as exc:
+        return CheckResult(
+            name="production_model_evidence",
+            status="fail",
+            detail=f"failed to parse metrics metadata ({exc})",
+            evidence_type="production",
+        )
+
+    if model_version and model_version != "v1":
+        return CheckResult(
+            name="production_model_evidence",
+            status="fail",
+            detail=f"metrics model_version must be v1 for production evidence (got {model_version})",
+            evidence_type="production",
+        )
+    if artifact_tag and artifact_tag != "prod":
+        return CheckResult(
+            name="production_model_evidence",
+            status="fail",
+            detail=f"metrics artifact_tag must be prod for production evidence (got {artifact_tag})",
+            evidence_type="production",
+        )
+    if train_rows < min_train_rows:
+        return CheckResult(
+            name="production_model_evidence",
+            status="fail",
+            detail=f"train_rows={train_rows} below production threshold {min_train_rows}",
+            evidence_type="production",
+        )
+
+    return CheckResult(
+        name="production_model_evidence",
+        status="pass",
+        detail=f"production model metadata validated (train_rows={train_rows}, threshold={min_train_rows})",
+        artifacts=base.artifacts,
+        evidence_type="production",
+    )
+
+
+def _arena_governance_check(
+    *,
+    arena_policy_path: Path,
+    arena_dir: Path,
+    tracking_uri: str | None,
+) -> CheckResult:
+    try:
+        policy = load_policy(arena_policy_path)
+    except Exception as exc:
+        return CheckResult(
+            name="arena_governance_production",
+            status="fail",
+            detail=f"failed to load arena policy ({exc})",
+            evidence_type="production",
+        )
+
+    model_name = str(policy.get("registered_model_name", "spec-nyc-avm"))
+    champion_quality = policy.get("champion_quality", {})
+    min_ppe10 = float(champion_quality.get("min_overall_ppe10", 0.24))
+    max_mdape = float(champion_quality.get("max_overall_mdape", 0.30))
+
+    try:
+        import mlflow
+    except Exception as exc:
+        return CheckResult(
+            name="arena_governance_production",
+            status="fail",
+            detail=f"mlflow unavailable for arena check ({exc})",
+            evidence_type="production",
+        )
+
+    if tracking_uri:
+        mlflow.set_tracking_uri(tracking_uri)
+    elif os.getenv("MLFLOW_TRACKING_URI"):
+        mlflow.set_tracking_uri(os.getenv("MLFLOW_TRACKING_URI"))
+    client = mlflow.tracking.MlflowClient()
+
+    try:
+        champion_version = client.get_model_version_by_alias(model_name, "champion")
+    except Exception as exc:
+        return CheckResult(
+            name="arena_governance_production",
+            status="fail",
+            detail=f"champion alias not set for {model_name} ({exc})",
+            evidence_type="production",
+        )
+
+    run_id = str(champion_version.run_id)
+    run_data = client.get_run(run_id).data
+    ppe10 = float(run_data.metrics.get("ppe10", 0.0))
+    mdape = float(run_data.metrics.get("mdape", 999.0))
+    if ppe10 < min_ppe10:
+        return CheckResult(
+            name="arena_governance_production",
+            status="fail",
+            detail=f"champion PPE10 below policy ({ppe10:.4f} < {min_ppe10:.4f})",
+            evidence_type="production",
+        )
+    if mdape > max_mdape:
+        return CheckResult(
+            name="arena_governance_production",
+            status="fail",
+            detail=f"champion MdAPE above policy ({mdape:.4f} > {max_mdape:.4f})",
+            evidence_type="production",
+        )
+
+    proposals = sorted(arena_dir.glob("proposal_*.json"), key=lambda p: p.stat().st_mtime, reverse=True)
+    if not proposals:
+        return CheckResult(
+            name="arena_governance_production",
+            status="fail",
+            detail=f"no arena proposals found in {arena_dir}",
+            evidence_type="production",
+        )
+    latest = json.loads(proposals[0].read_text(encoding="utf-8"))
+    if latest.get("status") != "approved":
+        return CheckResult(
+            name="arena_governance_production",
+            status="fail",
+            detail=f"latest proposal is not approved (status={latest.get('status')})",
+            evidence_type="production",
+        )
+    if proposal_is_expired(latest):
+        return CheckResult(
+            name="arena_governance_production",
+            status="fail",
+            detail="latest approved proposal is expired",
+            evidence_type="production",
+        )
+
+    change_log = arena_dir / "model_change_log.md"
+    if not change_log.exists():
+        return CheckResult(
+            name="arena_governance_production",
+            status="fail",
+            detail=f"required change log missing: {change_log}",
+            evidence_type="production",
+        )
+
+    return CheckResult(
+        name="arena_governance_production",
+        status="pass",
+        detail=(
+            f"arena governance pass: champion alias={champion_version.version}, "
+            f"latest_proposal={proposals[0].name}, ppe10={ppe10:.4f}, mdape={mdape:.4f}"
+        ),
+        artifacts=[str(proposals[0]), str(change_log)],
+        evidence_type="production",
+    )
+
+
+def _run_smoke_checks(args: argparse.Namespace, *, db_env: Dict[str, str], smoke_dir: Path) -> List[CheckResult]:
     etl_input = _build_etl_smoke_input(smoke_dir / "etl_raw_smoke.csv")
     training_input = _build_training_smoke_input(smoke_dir / "train_smoke.csv")
     monitoring_reference, monitoring_current = _prepare_monitoring_inputs(smoke_dir, training_input)
 
     checks: List[CheckResult] = []
-
     checks.append(run_command("unit_tests", "python3 -m unittest tests.test_etl tests.test_evaluate tests.test_ai_security tests.test_monitoring -v", timeout_sec=300))
     checks.append(run_command("docker_compose_config", "docker compose config -q", timeout_sec=60))
     checks.append(run_command("docker_compose_up_db", "docker compose up -d db", timeout_sec=180))
@@ -507,7 +743,7 @@ def run_validation(args: argparse.Namespace) -> int:
     checks.append(
         run_command(
             "etl_smoke",
-            f"python3 -m src.etl --input {etl_input} --limit 220 --dry-run --write-report",
+            f"python3 -m src.etl --input {etl_input} --limit 220 --dry-run --write-report --report-tag w6_smoke",
             timeout_sec=240,
         )
     )
@@ -601,7 +837,6 @@ def run_validation(args: argparse.Namespace) -> int:
         )
     )
     checks.append(run_streamlit_smoke(port=args.streamlit_port, timeout_sec=40))
-
     checks.append(
         check_artifacts(
             required_paths=[
@@ -618,17 +853,81 @@ def run_validation(args: argparse.Namespace) -> int:
             pattern_paths=["reports/data/etl_run_*.md", "reports/data/etl_run_*.csv"],
         )
     )
-
     checks.append(run_command("docker_compose_stop_db", "docker compose stop db", timeout_sec=120))
+    return checks
 
-    pre_tag_gates = evaluate_gates(checks)
+
+def _run_production_checks(args: argparse.Namespace) -> List[CheckResult]:
+    checks: List[CheckResult] = []
+    checks.append(
+        run_command(
+            "unit_tests",
+            "python3 -m unittest tests.test_etl tests.test_evaluate tests.test_ai_security tests.test_monitoring -v",
+            timeout_sec=300,
+            evidence_type="production",
+        )
+    )
+    checks.append(_production_etl_report_check())
+    checks.append(_production_model_evidence_check(min_train_rows=args.production_min_train_rows))
+    checks.append(
+        check_artifacts(
+            required_paths=[Path("app.py")],
+            pattern_paths=[],
+            name="production_product_evidence",
+            evidence_type="production",
+        )
+    )
+    checks.append(
+        check_artifacts(
+            required_paths=[
+                Path("reports/monitoring/drift_latest.json"),
+                Path("reports/monitoring/performance_latest.json"),
+                Path("reports/releases/retrain_decision_latest.json"),
+            ],
+            pattern_paths=[],
+            name="production_ops_evidence",
+            evidence_type="production",
+        )
+    )
+    checks.append(
+        run_streamlit_smoke(
+            port=args.streamlit_port,
+            timeout_sec=40,
+            name="streamlit_app_production",
+            evidence_type="production",
+        )
+    )
+    checks.append(
+        _arena_governance_check(
+            arena_policy_path=args.arena_policy_path,
+            arena_dir=args.arena_dir,
+            tracking_uri=args.mlflow_tracking_uri,
+        )
+    )
+    return checks
+
+
+def run_validation(args: argparse.Namespace) -> int:
+    started_at = datetime.utcnow()
+    REPORT_DIR.mkdir(parents=True, exist_ok=True)
+    LOG_DIR.mkdir(parents=True, exist_ok=True)
+    db_env = {"DATABASE_URL": args.database_url}
+    smoke_dir = REPORT_DIR / "smoke_inputs"
+    smoke_dir.mkdir(parents=True, exist_ok=True)
+
+    if args.mode == "production":
+        checks = _run_production_checks(args)
+    else:
+        checks = _run_smoke_checks(args, db_env=db_env, smoke_dir=smoke_dir)
+
+    pre_tag_gates = evaluate_gates(checks, mode=args.mode)
     core_gates_green = all(
         pre_tag_gates.get(gate, {}).get("status") == "done"
         for gate in ("Gate A (Data)", "Gate B (Model)", "Gate C (Product)", "Gate D (Ops)")
     )
     tag_result = maybe_tag_release(enabled=args.tag_release and core_gates_green)
     checks.append(tag_result)
-    gates = evaluate_gates(checks)
+    gates = evaluate_gates(checks, mode=args.mode)
     gate_e_green = bool(gates.get("Gate E (Release)", {}).get("all_green"))
 
     finished_at = datetime.utcnow()
@@ -639,6 +938,7 @@ def run_validation(args: argparse.Namespace) -> int:
         output_json=args.output_json,
         started_at=started_at,
         finished_at=finished_at,
+        validation_mode=args.mode,
     )
 
     print(json.dumps({"gate_e_all_green": gate_e_green, "report_md": str(args.output_md), "report_json": str(args.output_json)}, indent=2))
@@ -649,8 +949,23 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Validate S.P.E.C. NYC v1 release readiness (W6).")
     parser.add_argument("--output-md", type=Path, default=Path("reports/validation/v1_readiness_report.md"))
     parser.add_argument("--output-json", type=Path, default=Path("reports/validation/v1_readiness_report.json"))
+    parser.add_argument(
+        "--mode",
+        choices=("smoke", "production"),
+        default="smoke",
+        help="Validation mode: smoke (full synthetic checks) or production (strict evidence gating).",
+    )
     parser.add_argument("--database-url", type=str, default=DEFAULT_DB_URL)
     parser.add_argument("--smoke-model-version", type=str, default="v1_smoke")
+    parser.add_argument(
+        "--production-min-train-rows",
+        type=int,
+        default=5000,
+        help="Minimum train_rows required in models/metrics_v1.json for production evidence.",
+    )
+    parser.add_argument("--mlflow-tracking-uri", type=str, default=os.getenv("MLFLOW_TRACKING_URI"))
+    parser.add_argument("--arena-policy-path", type=Path, default=Path("config/arena_policy.yaml"))
+    parser.add_argument("--arena-dir", type=Path, default=Path("reports/arena"))
     parser.add_argument("--streamlit-port", type=int, default=8504)
     parser.add_argument("--tag-release", action="store_true", help="Create git tag v1.0 when all gates are green.")
     return parser

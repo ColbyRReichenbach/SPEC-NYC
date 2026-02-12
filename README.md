@@ -1,139 +1,143 @@
-# S.P.E.C. Valuation Engine - NYC Edition
+# S.P.E.C. NYC
 
-**Spatial · Predictive · Explainable · Conversational**
+An applied data science and MLOps project for NYC residential AVM development.
 
-A production-grade Automated Valuation Model (AVM) for NYC residential real estate. Uses machine learning with quantified uncertainty and SHAP-based explainability.
+I built this repository to show how I work as a production-minded data scientist: define hypotheses, build reliable data pipelines, train and evaluate models with segment-level accountability, and make controlled champion/challenger decisions with auditable evidence.
 
-![Python](https://img.shields.io/badge/Python-3.11+-3776AB?style=flat&logo=python&logoColor=white)
-![XGBoost](https://img.shields.io/badge/XGBoost-ML-FF6600?style=flat)
-![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Database-4169E1?style=flat&logo=postgresql&logoColor=white)
-![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?style=flat&logo=docker&logoColor=white)
+## Why I Built It
 
----
+Most DS portfolios stop at notebooks and one model metric. This project is intentionally different.
 
-## 🚧 Status: V1.0 In Development
+I wanted to demonstrate a full lifecycle that reflects how teams operate in real environments:
+- data ingestion and ETL with data contracts,
+- reproducible model training and evaluation,
+- explainability artifacts,
+- model registry and promotion controls,
+- monitoring, retrain policy, and release validation.
 
-This project is being built following the [Implementation Plan](docs/NYC_IMPLEMENTATION_PLAN.md).
+## What This Repository Demonstrates
 
----
+1. Reliable data foundation:
+- NYC Open Data connector with retries, pagination, caching, and annualized pulls (`src/connectors.py`).
+- ETL with residential filtering, property ID normalization, duplicate handling, segmentation, imputation, and Postgres load (`src/etl.py`).
+- explicit data-contract checks for schema, freshness, null thresholds, and domain constraints (`src/validation/data_contracts.py`).
 
-## Project Goals
+2. Production-style modeling:
+- baseline XGBoost training pipeline with time-based split and optional Optuna tuning (`src/model.py`).
+- global and segmented routing strategies with fallback behavior.
+- leakage controls around price-tier usage (routing safeguards and proxy requirement for tier-based routing).
 
-| Goal | Description |
-|------|-------------|
-| **Real Data** | 1M+ actual NYC transactions (not simulated) |
-| **Uncertainty** | Confidence intervals, not just point estimates |
-| **Explainability** | SHAP-based feature attribution |
-| **Production Ready** | PostgreSQL, Docker, API-first architecture |
+3. Evaluation and explainability:
+- overall and slice metrics (PPE10, MdAPE, R2) (`src/evaluate.py`).
+- segment and tier scorecards.
+- SHAP summary and waterfall artifacts (`src/explain.py`).
 
----
+4. MLOps lifecycle controls:
+- MLflow run tracking with structured change metadata (`src/mlops/track_run.py`).
+- registry alias lifecycle (`champion`, `challenger`, `candidate`).
+- arena-based promotion proposals with policy gates and human approval/rejection (`src/mlops/arena.py`, `config/arena_policy.yaml`).
 
-## Quick Start
+5. Operational validation:
+- drift and performance monitors (`src/monitoring/`).
+- retrain policy outputs (`src/retrain_policy.py`).
+- release readiness validation with evidence-aware checks (`src/validate_release.py`).
 
-```bash
-# 1. Clone and setup
-git clone https://github.com/ColbyRReichenbach/SPEC-NYC.git
-cd SPEC-NYC
+6. Stakeholder-facing product layer:
+- Streamlit app that reads model/evaluation artifacts and supports valuation workflows (`app.py`).
 
-# 2. Copy environment file
-cp .env.example .env
+## Current Status (As Of February 12, 2026)
 
-# 3. Start services
-docker-compose up -d
+The core v1 DS/MLOps workflow is implemented and operational for local/offline experimentation.
 
-# 4. Access dashboard
-open http://localhost:8501
-```
+| Area | Status | Primary Evidence |
+|---|---|---|
+| Data connector + ETL | Implemented | `src/connectors.py`, `src/etl.py` |
+| Data contracts + ETL tests | Implemented | `src/validation/data_contracts.py`, `tests/test_etl.py` |
+| Baseline model + evaluation + SHAP | Implemented | `src/model.py`, `src/evaluate.py`, `src/explain.py` |
+| Champion/challenger arena | Implemented | `src/mlops/track_run.py`, `src/mlops/arena.py` |
+| Monitoring + retrain policy | Implemented | `src/monitoring/`, `src/retrain_policy.py` |
+| Release validation | Implemented | `src/validate_release.py` |
+| DS workflow runbooks | Implemented | `docs/DS_ROLE_WORKFLOW.md`, `docs/MLOPS_ARENA_WORKFLOW.md` |
+| Next model improvements | Active backlog | `docs/hypotheses/HYPOTHESIS_BACKLOG.md`, `docs/hypotheses/FEATURE_BACKLOG.md` |
 
----
+## How I Treat This As A Real DS Workflow
 
-## Data Sources
+I treat model work as hypothesis-driven, not ad-hoc retraining.
 
-| Dataset | Source | Purpose |
-|---------|--------|---------|
-| Annualized Sales (`w2pb-icbu`) | [NYC Open Data](https://data.cityofnewyork.us/resource/w2pb-icbu) | Primary sales dataset (includes lat/lon + BBL) |
-| MTA Subway Stations | [data.ny.gov](https://data.ny.gov/Transportation/MTA-Subway-Stations/39hk-dx4f) | Transit proximity features (planned) |
+For every meaningful experiment, I track:
+- hypothesis ID,
+- change type and rationale,
+- dataset version,
+- feature set version,
+- owner,
+- measurable pass/fail gates,
+- promotion decision and rollback path.
 
-As of **February 10, 2026**, the Annualized Sales API range is `2016-01-01` to `2024-12-31`.
+Key process docs:
+- DS operating model: `docs/DS_ROLE_WORKFLOW.md`
+- Arena lifecycle: `docs/MLOPS_ARENA_WORKFLOW.md`
+- Hypothesis template: `docs/hypotheses/HYPOTHESIS_TEMPLATE.md`
+- Backlog and branching: `docs/hypotheses/HYPOTHESIS_BACKLOG.md`
+- Dataset and feature change control: `docs/DATASET_FEATURE_CHANGE_PROCESS.md`
 
-See `docs/DATA_SOURCES_DECISION_LOG.md` for source-selection rationale.
+## Data And Feature Governance Principles
 
----
+This project uses two required version labels for reproducibility:
+- `dataset_version`: the exact data snapshot used for training.
+- `feature_set_version`: the exact feature logic/version used by the model.
 
-## Data Bootstrap (Real NYC Data)
+I separate exploratory feature work from promoted feature work:
+- exploratory features can start in training code,
+- durable features should be promoted into ETL once validated.
 
-```bash
-# Canonical bootstrap (download + db + idempotent ETL load)
-./scripts/bootstrap_data.sh
-```
+This keeps model lineage clear and makes artifact comparisons meaningful.
 
-Useful variants:
+## Modeling Strategy
 
-```bash
-# Dry-run ETL only (no DB load)
-./scripts/bootstrap_data.sh --dry-run
+Current strategy support:
+- global model,
+- segmented router model (`segment_only`),
+- staged support for `segment_plus_tier` with non-leaky tier proxy requirements.
 
-# Reuse already-downloaded raw file and already-running DB
-./scripts/bootstrap_data.sh --skip-download --skip-db-start
+Why XGBoost for baseline:
+- strong performance on structured/tabular data,
+- robust with mixed numeric/categorical pipelines,
+- efficient iteration for hypothesis testing,
+- SHAP compatibility for feature attribution.
 
-# Smaller pull window for quick validation
-./scripts/bootstrap_data.sh --start-year 2024 --end-year 2024
-```
+## Artifact-First Project Layout
 
-Expected outputs:
-- Raw file: `data/raw/annualized_sales_2019_2025.csv`
-- ETL report: `reports/data/etl_run_YYYYMMDD.md`
-- Postgres table: `sales` populated with cleaned/segmented rows
+If you are reviewing this as a hiring manager or technical lead, these paths show the workflow quality quickly:
 
-Optional:
-- Set `SOCRATA_APP_TOKEN` in `.env` to improve API reliability on large pulls.
+- data and ETL evidence: `reports/data/`
+- model metrics and scorecards: `models/`, `reports/model/`
+- arena decisions and change notes: `reports/arena/`
+- monitoring outputs: `reports/monitoring/`
+- release readiness reports: `reports/validation/`
+- release policy artifacts: `reports/releases/`
 
----
+## What I Plan To Improve Next
 
-## V1 Baseline Snapshot
+Current priority stream is model strengthening and feature expansion, including:
+- safer tier proxy strategy for segmented routing,
+- NYC-specific feature engineering (transit, liquidity, temporal regime signals),
+- continued challenger evaluation through arena gates before promotion.
 
-Data snapshot (latest ETL):
-- Cleaned + loaded rows: `293,716`
-- Date range: `2019-01-01` to `2024-12-31`
-- Segments: `SINGLE_FAMILY`, `ELEVATOR`, `WALKUP`, `SMALL_MULTI`
+Tracked in:
+- `docs/hypotheses/FEATURE_BACKLOG.md`
+- `docs/hypotheses/HYPOTHESIS_BACKLOG.md`
 
-Model baseline (`models/metrics_v1.json`):
-- Overall PPE10: `87.5%`
-- Overall MdAPE: `3.89%`
-- Overall R2: `0.796`
-- Segment PPE10: `ELEVATOR 88.37%`, `SINGLE_FAMILY 86.05%`, `SMALL_MULTI 100.00%`, `WALKUP 76.47%`
+## Project Positioning
 
-Artifacts:
-- Metrics: `models/metrics_v1.json`
-- Segment scorecard: `reports/model/segment_scorecard_v1.csv`
-- SHAP plots: `reports/model/shap_summary_v1.png`, `reports/model/shap_waterfall_v1.png`
-
----
-
-## Roadmap
-
-- [ ] **V1.0**: NYC data pipeline, XGBoost model, Streamlit UI
-- [ ] **V2.0**: Quantile regression, NYC spatial features, backtesting
-- [ ] **V3.0**: FastAPI backend, React frontend, PDF reports
-- [ ] **V4.0**: AI investment memos, performance optimization
-
-See [Implementation Plan](docs/NYC_IMPLEMENTATION_PLAN.md) for detailed task breakdown.
-
----
-
-## Related Project
-
-This is the production-data version of the [S.P.E.C. Valuation Engine (SF)](https://github.com/ColbyRReichenbach/S.P.E.C-Valuation), which demonstrates the architecture using simulated data.
-
----
+This repo is the NYC production-data progression of my earlier S.P.E.C. valuation work. The emphasis here is less on demo UI and more on end-to-end DS execution quality, model governance, and reproducible MLOps behavior.
 
 ## Author
 
-**Colby Reichenbach**  
-[GitHub](https://github.com/ColbyRReichenbach) · [LinkedIn](https://linkedin.com/in/colbyreichenbach)
+Colby Reichenbach
 
----
+GitHub: [ColbyRReichenbach](https://github.com/ColbyRReichenbach)
+LinkedIn: [colbyreichenbach](https://linkedin.com/in/colbyreichenbach)
 
 ## License
 
-MIT License - See [LICENSE](LICENSE) for details.
+MIT License (`LICENSE`)

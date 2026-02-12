@@ -1,0 +1,31 @@
+{
+  "registered_model_name": "spec-nyc-avm",
+  "experiment_name": "spec-nyc-avm",
+  "selection_window": 5,
+  "major_segment_min_n": 2000,
+  "gates": {
+    "weighted_segment_mdape_improvement": 0.05,
+    "max_major_segment_ppe10_drop": 0.02,
+    "major_segment_ppe10_floor": 0.24,
+    "no_new_drift_alerts": true,
+    "no_new_fairness_alerts": true
+  },
+  "fairness": {
+    "max_segment_ppe10_gap": 0.20
+  },
+  "scoring": {
+    "mdape_weight": 0.50,
+    "ppe10_weight": 0.30,
+    "stability_weight": 0.20
+  },
+  "promotion": {
+    "mode": "semi_auto",
+    "proposal_expiry_hours": 24,
+    "approval_required": true,
+    "auto_expire_pending": true
+  },
+  "champion_quality": {
+    "min_overall_ppe10": 0.24,
+    "max_overall_mdape": 0.30
+  }
+}

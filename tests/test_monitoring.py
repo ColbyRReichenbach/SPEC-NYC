@@ -1,10 +1,12 @@
 import unittest
+from pathlib import Path
+import tempfile
 
 import numpy as np
 import pandas as pd
 
 from src.monitoring.drift import calculate_ks, calculate_psi, monitor_drift
-from src.monitoring.performance import evaluate_performance
+from src.monitoring.performance import _select_latest_artifact, evaluate_performance
 from src.retrain_policy import evaluate_retrain_policy
 
 
@@ -56,7 +58,21 @@ class TestMonitoring(unittest.TestCase):
         self.assertTrue(decision["should_retrain"])
         self.assertEqual(decision["decision"], "retrain")
 
+    def test_select_latest_artifact_prefers_production(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            base = Path(tmpdir)
+            prod = base / "evaluation_predictions_v1.csv"
+            smoke_newer = base / "evaluation_predictions_v1_smoke.csv"
+
+            prod.write_text("x", encoding="utf-8")
+            smoke_newer.write_text("x", encoding="utf-8")
+
+            # Ensure smoke appears newer by modified time.
+            smoke_newer.touch()
+
+            selected = _select_latest_artifact([prod, smoke_newer])
+            self.assertEqual(selected, prod)
+
 
 if __name__ == "__main__":
     unittest.main()
-

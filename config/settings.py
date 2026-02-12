@@ -117,7 +117,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://spec:spec_password@localhost:5432/spec_nyc")
+DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://spec:spec_password@localhost:5433/spec_nyc")
 DATABASE_PATH = os.getenv("DATABASE_PATH", str(DATA_PROCESSED / "spec_nyc.sqlite3"))
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 

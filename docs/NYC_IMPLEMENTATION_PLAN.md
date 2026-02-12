@@ -87,12 +87,12 @@ SPEC-NYC/
 ### 1.2 Infrastructure Setup
 
 - [x] Create `docker-compose.yml` with:
-  - PostgreSQL 15 service (port 5432)
+  - PostgreSQL 15 service (host port 5433 -> container 5432)
   - Streamlit app service (port 8501)
   - Shared network
 - [x] Create `Dockerfile` for Streamlit app
 - [x] Create `.env.example` with database credentials
-- [ ] Test: `docker-compose up -d` starts both services
+- [ ] Test: `docker compose up -d` starts both services
 
 ### 1.3 Database Schema ✅
 
@@ -231,7 +231,7 @@ CATEGORICAL_FEATURES = [
 
 ### 1.10 V1.0 Deliverables Checklist
 
-- [ ] Docker Compose works (`docker-compose up`)
+- [ ] Docker Compose works (`docker compose up`)
 - [x] PostgreSQL contains cleaned, segmented NYC data
 - [x] All imputation documented in DATA_QUALITY_LOG.md
 - [x] Global model achieves ≥70% PPE10 overall
@@ -522,7 +522,7 @@ These files can be adapted from the existing SF codebase:
 
 ```bash
 # Start all services
-docker-compose up -d
+docker compose up -d
 
 # Run ETL pipeline
 python -m src.etl

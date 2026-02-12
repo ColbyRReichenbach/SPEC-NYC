@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 from pathlib import Path
 from typing import Dict, Iterable
 
@@ -146,16 +147,55 @@ def save_metrics(metrics: Dict[str, object], path: Path) -> None:
     path.write_text(json.dumps(metrics, indent=2), encoding="utf-8")
 
 
+def _normalize_artifact_tag(tag: str | None) -> str:
+    raw = (tag or "").strip().lower()
+    if not raw:
+        return "prod"
+    normalized = re.sub(r"[^a-z0-9_\-]", "_", raw).strip("_")
+    return normalized or "prod"
+
+
+def _artifact_stem(model_version: str, artifact_tag: str) -> str:
+    normalized_tag = _normalize_artifact_tag(artifact_tag)
+    return model_version if normalized_tag == "prod" else f"{model_version}_{normalized_tag}"
+
+
+def _resolve_output_paths(
+    *,
+    model_version: str,
+    artifact_tag: str,
+    output_json: Path | None,
+    segment_scorecard_csv: Path | None,
+) -> tuple[Path, Path]:
+    stem = _artifact_stem(model_version, artifact_tag)
+    metrics_path = output_json or Path(f"models/metrics_{stem}.json")
+    scorecard_path = segment_scorecard_csv or Path(f"reports/model/segment_scorecard_{stem}.csv")
+    return metrics_path, scorecard_path
+
+
 def _cli() -> None:
     parser = argparse.ArgumentParser(description="Evaluate model predictions for S.P.E.C. NYC")
     parser.add_argument("--predictions-csv", type=Path, required=True, help="CSV with sale_price + predicted_price")
-    parser.add_argument("--output-json", type=Path, default=Path("models/metrics_v1.json"))
-    parser.add_argument("--segment-scorecard-csv", type=Path, default=Path("reports/model/segment_scorecard_v1.csv"))
+    parser.add_argument("--output-json", type=Path, default=None)
+    parser.add_argument("--segment-scorecard-csv", type=Path, default=None)
+    parser.add_argument("--model-version", type=str, default="v1")
+    parser.add_argument(
+        "--artifact-tag",
+        type=str,
+        default="prod",
+        help="Artifact suffix tag. Use 'prod' for canonical paths; non-prod tags append _<tag>.",
+    )
     parser.add_argument("--y-true-col", type=str, default="sale_price")
     parser.add_argument("--y-pred-col", type=str, default="predicted_price")
     parser.add_argument("--segment-col", type=str, default="property_segment")
     parser.add_argument("--tier-col", type=str, default="price_tier")
     args = parser.parse_args()
+    output_json, segment_scorecard_csv = _resolve_output_paths(
+        model_version=args.model_version,
+        artifact_tag=args.artifact_tag,
+        output_json=args.output_json,
+        segment_scorecard_csv=args.segment_scorecard_csv,
+    )
 
     frame = pd.read_csv(args.predictions_csv)
     metrics = evaluate_predictions(
@@ -165,7 +205,7 @@ def _cli() -> None:
         segment_col=args.segment_col,
         tier_col=args.tier_col,
     )
-    save_metrics(metrics, args.output_json)
+    save_metrics(metrics, output_json)
 
     scorecard = build_segment_scorecard(
         frame,
@@ -174,11 +214,11 @@ def _cli() -> None:
         segment_col=args.segment_col,
         tier_col=args.tier_col,
     )
-    args.segment_scorecard_csv.parent.mkdir(parents=True, exist_ok=True)
-    scorecard.to_csv(args.segment_scorecard_csv, index=False)
+    segment_scorecard_csv.parent.mkdir(parents=True, exist_ok=True)
+    scorecard.to_csv(segment_scorecard_csv, index=False)
 
-    print(f"Saved metrics JSON: {args.output_json}")
-    print(f"Saved segment scorecard: {args.segment_scorecard_csv}")
+    print(f"Saved metrics JSON: {output_json}")
+    print(f"Saved segment scorecard: {segment_scorecard_csv}")
     print(
         f"Overall => n={metrics['overall']['n']}, PPE10={metrics['overall']['ppe10']:.3f}, "
         f"MdAPE={metrics['overall']['mdape']:.3f}, R2={metrics['overall']['r2']:.3f}"
@@ -187,4 +227,3 @@ def _cli() -> None:
 
 if __name__ == "__main__":
     _cli()
-

@@ -1,8 +1,12 @@
 import unittest
+from datetime import datetime
+from pathlib import Path
+import tempfile
 
 import numpy as np
 import pandas as pd
 
+import src.etl as etl_module
 from src.etl import clean_data, create_property_id, deduplicate, enrich_sales_history, impute_missing_values
 
 
@@ -100,6 +104,83 @@ class TestEtlTransforms(unittest.TestCase):
 
         apt_1a = deduped[deduped["property_id"] == "1000000001_1A"].sort_values("sale_date")
         self.assertEqual(len(apt_1a), 2)
+
+    def test_property_id_fallback_from_address_suffix_preserves_distinct_units(self):
+        df = pd.DataFrame(
+            [
+                {
+                    "bbl": 3053890010,
+                    "address": "430 OCEAN PARKWAY, 1A",
+                    "apartment_number": np.nan,
+                    "sale_date": "2022-06-21",
+                    "sale_price": 18336313,
+                },
+                {
+                    "bbl": 3053890010,
+                    "address": "430 OCEAN PARKWAY, 1B",
+                    "apartment_number": np.nan,
+                    "sale_date": "2022-06-21",
+                    "sale_price": 18336313,
+                },
+                {
+                    "bbl": 3053890010,
+                    "address": "430 OCEAN PARKWAY, 1A",
+                    "apartment_number": np.nan,
+                    "sale_date": "2022-06-21",
+                    "sale_price": 18336313,
+                },
+            ]
+        )
+        df["sale_date"] = pd.to_datetime(df["sale_date"])
+
+        with_ids = create_property_id(df)
+        deduped = deduplicate(with_ids)
+
+        # Unit extracted from address suffix if apartment_number is missing.
+        self.assertIn("3053890010_1A", with_ids["property_id"].values)
+        self.assertIn("3053890010_1B", with_ids["property_id"].values)
+
+        # The repeated 1A row is dropped; distinct 1B row is preserved.
+        self.assertEqual(len(deduped), 2)
+        self.assertEqual(set(deduped["property_id"].unique()), {"3053890010_1A", "3053890010_1B"})
+
+    def test_address_suffix_street_token_not_used_as_unit(self):
+        df = pd.DataFrame(
+            [
+                {
+                    "bbl": 1000000001,
+                    "address": "100 MAIN STREET, STREET",
+                    "apartment_number": np.nan,
+                    "sale_date": "2024-01-01",
+                    "sale_price": 100000,
+                }
+            ]
+        )
+        df["sale_date"] = pd.to_datetime(df["sale_date"])
+
+        with_ids = create_property_id(df)
+        self.assertEqual(with_ids.iloc[0]["property_id"], "1000000001")
+        self.assertEqual(with_ids.iloc[0]["property_id_source"], "bbl_only")
+
+    def test_write_etl_report_uses_tagged_artifacts(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            original_reports_dir = etl_module.REPORTS_DATA_DIR
+            try:
+                etl_module.REPORTS_DATA_DIR = Path(tmpdir)
+                md_path, csv_path = etl_module._write_etl_report(
+                    run_started_at=datetime(2026, 2, 11, 12, 0, 0),
+                    input_path=Path("data/raw/sample.csv"),
+                    dry_run=True,
+                    stage_stats=[{"stage": "cleaned", "rows": 10, "unique_properties": 9, "latest_sale_date": "2025-01-01"}],
+                    contract_results=[],
+                    report_tag="w6_smoke",
+                )
+                self.assertTrue(md_path.name.endswith("etl_run_20260211_w6_smoke.md"))
+                self.assertTrue(csv_path.name.endswith("etl_run_20260211_w6_smoke.csv"))
+                self.assertTrue(md_path.exists())
+                self.assertTrue(csv_path.exists())
+            finally:
+                etl_module.REPORTS_DATA_DIR = original_reports_dir
 
     def test_enrich_sales_history_derivations(self):
         df = pd.DataFrame(

@@ -1,8 +1,9 @@
 import unittest
+from pathlib import Path
 
 import pandas as pd
 
-from src.evaluate import build_segment_scorecard, evaluate_predictions
+from src.evaluate import _resolve_output_paths, build_segment_scorecard, evaluate_predictions
 
 
 class TestEvaluate(unittest.TestCase):
@@ -37,7 +38,26 @@ class TestEvaluate(unittest.TestCase):
         self.assertIn("group_type", scorecard.columns)
         self.assertIn("ppe10", scorecard.columns)
 
+    def test_resolve_output_paths_prod_defaults(self):
+        metrics_path, scorecard_path = _resolve_output_paths(
+            model_version="v1",
+            artifact_tag="prod",
+            output_json=None,
+            segment_scorecard_csv=None,
+        )
+        self.assertEqual(metrics_path, Path("models/metrics_v1.json"))
+        self.assertEqual(scorecard_path, Path("reports/model/segment_scorecard_v1.csv"))
+
+    def test_resolve_output_paths_smoke_tag(self):
+        metrics_path, scorecard_path = _resolve_output_paths(
+            model_version="v1",
+            artifact_tag="w6_smoke",
+            output_json=None,
+            segment_scorecard_csv=None,
+        )
+        self.assertEqual(metrics_path, Path("models/metrics_v1_w6_smoke.json"))
+        self.assertEqual(scorecard_path, Path("reports/model/segment_scorecard_v1_w6_smoke.csv"))
+
 
 if __name__ == "__main__":
     unittest.main()
-

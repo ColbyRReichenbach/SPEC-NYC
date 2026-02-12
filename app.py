@@ -15,6 +15,12 @@ import streamlit as st
 from sqlalchemy import text
 
 from src.database import engine
+from src.inference import (
+    get_feature_columns,
+    predict_dataframe,
+    predict_single_row,
+    select_pipeline_for_row,
+)
 
 
 st.set_page_config(
@@ -50,9 +56,23 @@ SEGMENT_MAPPING = {
 }
 
 
-def _latest_file(pattern: str) -> Optional[Path]:
-    files = sorted(Path(".").glob(pattern), key=lambda p: p.stat().st_mtime)
-    return files[-1] if files else None
+def _is_smoke_artifact(path: Path) -> bool:
+    name = path.name.lower()
+    return "smoke" in name or "dryrun" in name
+
+
+def _latest_file(pattern: str, *, prefer_production: bool = True) -> Optional[Path]:
+    files = list(Path(".").glob(pattern))
+    if not files:
+        return None
+
+    if not prefer_production:
+        return max(files, key=lambda p: p.stat().st_mtime)
+
+    production_candidates = [p for p in files if not _is_smoke_artifact(p)]
+    if production_candidates:
+        return max(production_candidates, key=lambda p: p.stat().st_mtime)
+    return max(files, key=lambda p: p.stat().st_mtime)
 
 
 def _fmt_currency(value: Optional[float]) -> str:
@@ -223,7 +243,7 @@ def _build_valuation_frame(
     if model_artifact is None:
         return pd.DataFrame(), "none"
 
-    feature_cols = model_artifact.get("feature_columns", [])
+    feature_cols = get_feature_columns(model_artifact)
     source = "evaluation_predictions"
     candidate = eval_df.copy() if not eval_df.empty else sales_df.copy()
     if candidate.empty:
@@ -264,10 +284,7 @@ def predict_row(
     row: pd.Series,
 ) -> Tuple[Optional[float], Optional[str]]:
     try:
-        feature_cols = model_artifact["feature_columns"]
-        pipeline = model_artifact["pipeline"]
-        x = pd.DataFrame([row[feature_cols].to_dict()])
-        pred = float(pipeline.predict(x)[0])
+        pred, _route = predict_single_row(model_artifact, row)
         return pred, None
     except Exception as exc:
         return None, str(exc)
@@ -283,8 +300,8 @@ def explain_row(
         return pd.DataFrame(), None, f"xgboost import failed: {exc}"
 
     try:
-        feature_cols = model_artifact["feature_columns"]
-        pipeline = model_artifact["pipeline"]
+        feature_cols = get_feature_columns(model_artifact)
+        pipeline, _ = select_pipeline_for_row(model_artifact, row)
         pre = pipeline.named_steps["preprocessor"]
         model = pipeline.named_steps["model"]
         x = pd.DataFrame([row[feature_cols].to_dict()])
@@ -334,13 +351,14 @@ def add_valuation_status(
     if frame.empty or model_artifact is None:
         return frame, None
     out = _with_h3_price_lag(_normalize_sales_columns(frame))
-    feature_cols = model_artifact.get("feature_columns", [])
+    feature_cols = get_feature_columns(model_artifact)
     missing = [c for c in feature_cols if c not in out.columns]
     if missing:
         return out, None
     try:
-        pipeline = model_artifact["pipeline"]
-        out["predicted_price"] = pipeline.predict(out[feature_cols])
+        preds, routes = predict_dataframe(model_artifact, out)
+        out["predicted_price"] = preds
+        out["model_route"] = routes.values
         if "sale_price" in out.columns:
             diff = (pd.to_numeric(out["sale_price"], errors="coerce") - out["predicted_price"]) / out["predicted_price"]
             out["valuation_status"] = np.select(

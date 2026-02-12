@@ -12,9 +12,23 @@ import pandas as pd
 from src.evaluate import evaluate_predictions
 
 
+def _is_smoke_artifact(path: Path) -> bool:
+    name = path.name.lower()
+    return "smoke" in name or "dryrun" in name
+
+
+def _select_latest_artifact(paths: list[Path]) -> Optional[Path]:
+    if not paths:
+        return None
+    production_candidates = [p for p in paths if not _is_smoke_artifact(p)]
+    if production_candidates:
+        return max(production_candidates, key=lambda p: p.stat().st_mtime)
+    return max(paths, key=lambda p: p.stat().st_mtime)
+
+
 def find_latest_predictions() -> Optional[Path]:
-    files = sorted(Path("reports/model").glob("evaluation_predictions_*.csv"), key=lambda p: p.stat().st_mtime)
-    return files[-1] if files else None
+    files = list(Path("reports/model").glob("evaluation_predictions_*.csv"))
+    return _select_latest_artifact(files)
 
 
 def evaluate_performance(
@@ -94,4 +108,3 @@ def _cli() -> None:
 
 if __name__ == "__main__":
     _cli()
-
