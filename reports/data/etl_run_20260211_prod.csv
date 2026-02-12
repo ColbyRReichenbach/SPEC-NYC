@@ -1,0 +1,5 @@
+stage,rows,unique_properties,latest_sale_date
+extract_raw,498666,,2024-12-31
+cleaned,295917,,2024-12-31
+feature_engineered,295457,256430.0,2024-12-31
+loaded_postgres,295457,256430.0,2024-12-31

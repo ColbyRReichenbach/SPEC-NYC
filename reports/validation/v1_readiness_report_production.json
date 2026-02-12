@@ -1,0 +1,145 @@
+{
+  "validation_mode": "production",
+  "started_at_utc": "2026-02-11T22:55:37.063965",
+  "finished_at_utc": "2026-02-11T22:55:52.010786",
+  "duration_sec": 14.95,
+  "checks": [
+    {
+      "name": "unit_tests",
+      "status": "pass",
+      "detail": "exit=0; OK",
+      "command": "python3 -m unittest tests.test_etl tests.test_evaluate tests.test_ai_security tests.test_monitoring -v",
+      "duration_sec": 2.797565221786499,
+      "log_path": "reports/validation/logs/unit_tests.log",
+      "artifacts": null,
+      "evidence_type": "production"
+    },
+    {
+      "name": "production_data_evidence",
+      "status": "pass",
+      "detail": "found 2 production ETL markdown + 2 csv reports",
+      "command": null,
+      "duration_sec": 0.0,
+      "log_path": null,
+      "artifacts": [
+        "reports/data/etl_run_20260211.md",
+        "reports/data/etl_run_20260211_prod.md",
+        "reports/data/etl_run_20260211_prod.csv",
+        "reports/data/etl_run_20260211.csv"
+      ],
+      "evidence_type": "production"
+    },
+    {
+      "name": "production_model_evidence",
+      "status": "pass",
+      "detail": "production model metadata validated (train_rows=236365, threshold=5000)",
+      "command": null,
+      "duration_sec": 0.0,
+      "log_path": null,
+      "artifacts": [
+        "models/model_v1.joblib",
+        "models/metrics_v1.json",
+        "reports/model/segment_scorecard_v1.csv",
+        "reports/model/evaluation_predictions_v1.csv",
+        "reports/model/shap_summary_v1.png",
+        "reports/model/shap_waterfall_v1.png"
+      ],
+      "evidence_type": "production"
+    },
+    {
+      "name": "production_product_evidence",
+      "status": "pass",
+      "detail": "all required artifacts present",
+      "command": null,
+      "duration_sec": 0.0,
+      "log_path": null,
+      "artifacts": [
+        "app.py"
+      ],
+      "evidence_type": "production"
+    },
+    {
+      "name": "production_ops_evidence",
+      "status": "pass",
+      "detail": "all required artifacts present",
+      "command": null,
+      "duration_sec": 0.0,
+      "log_path": null,
+      "artifacts": [
+        "reports/monitoring/drift_latest.json",
+        "reports/monitoring/performance_latest.json",
+        "reports/releases/retrain_decision_latest.json"
+      ],
+      "evidence_type": "production"
+    },
+    {
+      "name": "streamlit_app_production",
+      "status": "pass",
+      "detail": "app process stayed healthy for startup window",
+      "command": "python3 -m streamlit run app.py --server.headless true --server.address 127.0.0.1 --server.port 8504",
+      "duration_sec": 12.14168381690979,
+      "log_path": "reports/validation/logs/streamlit_app_production.log",
+      "artifacts": null,
+      "evidence_type": "production"
+    },
+    {
+      "name": "release_tag",
+      "status": "pass",
+      "detail": "tagging skipped (--tag-release not set)",
+      "command": null,
+      "duration_sec": 0.0,
+      "log_path": null,
+      "artifacts": null,
+      "evidence_type": "release"
+    }
+  ],
+  "gates": {
+    "Gate A (Data)": {
+      "status": "done",
+      "required_checks": [
+        "unit_tests",
+        "production_data_evidence"
+      ],
+      "failed_checks": [],
+      "missing_checks": []
+    },
+    "Gate B (Model)": {
+      "status": "done",
+      "required_checks": [
+        "production_model_evidence"
+      ],
+      "failed_checks": [],
+      "missing_checks": []
+    },
+    "Gate C (Product)": {
+      "status": "done",
+      "required_checks": [
+        "streamlit_app_production",
+        "production_product_evidence"
+      ],
+      "failed_checks": [],
+      "missing_checks": []
+    },
+    "Gate D (Ops)": {
+      "status": "done",
+      "required_checks": [
+        "production_ops_evidence"
+      ],
+      "failed_checks": [],
+      "missing_checks": []
+    },
+    "Gate E (Release)": {
+      "status": "done",
+      "required_checks": [
+        "Gate A (Data)",
+        "Gate B (Model)",
+        "Gate C (Product)",
+        "Gate D (Ops)",
+        "release_tag"
+      ],
+      "failed_checks": [],
+      "missing_checks": [],
+      "all_green": true
+    }
+  }
+}
