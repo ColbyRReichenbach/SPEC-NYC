@@ -124,3 +124,17 @@ reports/demo/stakeholder_demo_snapshot_latest.json
 reports/demo/stakeholder_demo_snapshot_latest.md
 reports/validation/demo_smoke_readiness_latest.json
 reports/validation/demo_smoke_readiness_latest.md
+
+# ----- Local Arena/ETL Run Outputs (timestamped) -----
+reports/arena/run_card_*.md
+reports/arena/proposal_*.json
+reports/arena/proposal_*.md
+reports/arena/comparison_*.csv
+reports/data/canonical_mapping_*.json
+reports/data/etl_run_20*.csv
+reports/data/etl_run_20*.md
+reports/data/onboarding_profile_*.json
+reports/data/onboarding_profile_*.md
+reports/data/onboarding_report_*.md
+reports/validation/*_production_readiness_20*.json
+reports/validation/*_production_readiness_20*.md

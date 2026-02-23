@@ -7,7 +7,15 @@ import numpy as np
 import pandas as pd
 
 import src.etl as etl_module
-from src.etl import clean_data, create_property_id, deduplicate, enrich_sales_history, impute_missing_values
+from src.etl import (
+    assign_price_tier_proxy_feature,
+    clean_data,
+    create_property_id,
+    deduplicate,
+    enrich_sales_history,
+    feature_engineering,
+    impute_missing_values,
+)
 
 
 class TestEtlTransforms(unittest.TestCase):
@@ -233,6 +241,54 @@ class TestEtlTransforms(unittest.TestCase):
 
         self.assertTrue(bool(out.iloc[6]["year_built_imputed"]))
         self.assertEqual(int(out.iloc[6]["year_built"]), 1980)
+
+    def test_assign_price_tier_proxy_feature_outputs_non_null_proxy(self):
+        df = pd.DataFrame(
+            [
+                {
+                    "property_segment": "SINGLE_FAMILY",
+                    "gross_square_feet": 1200,
+                    "building_age": 45,
+                    "distance_to_center_km": 6.2,
+                    "total_units": 1,
+                    "residential_units": 1,
+                    "borough": 3,
+                },
+                {
+                    "property_segment": "ELEVATOR",
+                    "gross_square_feet": 2600,
+                    "building_age": 15,
+                    "distance_to_center_km": 2.1,
+                    "total_units": 24,
+                    "residential_units": 20,
+                    "borough": 1,
+                },
+            ]
+        )
+        out = assign_price_tier_proxy_feature(df)
+        self.assertIn("price_tier_proxy", out.columns)
+        self.assertIn("price_tier_proxy_source", out.columns)
+        self.assertTrue(out["price_tier_proxy"].notna().all())
+
+    def test_feature_engineering_adds_temporal_regime_columns(self):
+        df = pd.DataFrame(
+            [
+                {
+                    "latitude": 40.75,
+                    "longitude": -73.98,
+                    "year_built": 1990,
+                    "gross_square_feet": 1000.0,
+                    "sale_price": 750000.0,
+                    "sale_date": pd.Timestamp("2021-07-15"),
+                }
+            ]
+        )
+        out = feature_engineering(df)
+        self.assertIn("days_since_2019_start", out.columns)
+        self.assertIn("month_sin", out.columns)
+        self.assertIn("month_cos", out.columns)
+        self.assertIn("rate_regime_bucket", out.columns)
+        self.assertEqual(str(out.iloc[0]["rate_regime_bucket"]), "pandemic_low_rate")
 
 
 if __name__ == "__main__":

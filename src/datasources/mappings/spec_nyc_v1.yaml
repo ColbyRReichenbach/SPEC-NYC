@@ -1,4 +1,11 @@
 rename:
+  close_date: sale_date
+  close_price: sale_price
+  lat: latitude
+  lon: longitude
+  segment_hint: property_segment
+  sqft: gross_square_feet
+  built_year: year_built
   building_class_at_time_of: building_class
   census_tract_2020: census_tract
 defaults:

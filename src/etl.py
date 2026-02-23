@@ -31,6 +31,7 @@ from sqlalchemy import text
 from src.canonical import to_canonical, validate_canonical_contracts, write_mapping_report
 from src.datasources import get_datasource
 from src.database import Sales, create_tables, get_session
+from src.price_tier_proxy import assign_price_tier_proxy
 from src.validation.data_contracts import DataContractResult, validate_nyc_sales_contracts
 
 # Configure logging
@@ -47,6 +48,7 @@ logger = logging.getLogger(__name__)
 RAW_DATA_PATH = Path("data/raw/annualized_sales_2019_2025.csv")
 REPORTS_DATA_DIR = Path("reports/data")
 CURRENT_YEAR = 2025  # For building_age calculation
+TREND_BASE_DATE = pd.Timestamp("2019-01-01")
 
 # NYC Center (Manhattan - Columbus Circle)
 NYC_CENTER_LAT = 40.7831
@@ -96,6 +98,7 @@ POST_ETL_NULL_THRESHOLDS = {
     "property_id": 0.0,
     "property_segment": 0.0,
     "price_tier": 0.0,
+    "price_tier_proxy": 0.0,
     "gross_square_feet": 0.0,
     "year_built": 0.0,
 }
@@ -640,8 +643,48 @@ def feature_engineering(df: pd.DataFrame) -> pd.DataFrame:
         df['sale_price'] / df['gross_square_feet'],
         np.nan
     )
+
+    # 5. Temporal / regime features (inference-safe; based on sale_date only)
+    sale_date = pd.to_datetime(df['sale_date'], errors='coerce')
+    month = sale_date.dt.month.fillna(1).astype(float)
+    df['days_since_2019_start'] = (sale_date - TREND_BASE_DATE).dt.days.astype('float64')
+    radians = 2.0 * np.pi * (month - 1.0) / 12.0
+    df['month_sin'] = np.sin(radians).astype('float64')
+    df['month_cos'] = np.cos(radians).astype('float64')
+    df['rate_regime_bucket'] = np.select(
+        [
+            sale_date < pd.Timestamp("2020-03-01"),
+            sale_date < pd.Timestamp("2022-01-01"),
+            sale_date < pd.Timestamp("2024-01-01"),
+        ],
+        [
+            "pre_2020",
+            "pandemic_low_rate",
+            "post_hike_transition",
+        ],
+        default="high_rate_2024_plus",
+    )
     
     return df
+
+
+def assign_price_tier_proxy_feature(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Assign non-leaky proxy tiers using inference-available signals only.
+    Includes per-segment thresholds with global fallback for sparse/unknown cases.
+    """
+    logger.info("Assigning non-leaky price_tier_proxy...")
+    out, _ = assign_price_tier_proxy(df, segment_col="property_segment", min_segment_rows=800)
+    proxy_counts = out["price_tier_proxy"].value_counts(dropna=False)
+    logger.info("price_tier_proxy distribution:")
+    for tier in ("entry", "core", "premium", "luxury"):
+        if tier in proxy_counts.index:
+            logger.info("  %s: %s", tier, int(proxy_counts[tier]))
+    fallback_count = int((out["price_tier_proxy_source"] == "global_fallback").sum())
+    missing_count = int((out["price_tier_proxy_source"] == "default_core_missing_score").sum())
+    logger.info("  global_fallback rows: %s", fallback_count)
+    logger.info("  default_core_missing_score rows: %s", missing_count)
+    return out
 
 
 # =============================================================================
@@ -860,6 +903,7 @@ def run_etl(
 
         # 8. Feature Engineering
         df = feature_engineering(df)
+        df = assign_price_tier_proxy_feature(df)
         _record_stage(stage_stats, "feature_engineered", df)
 
         final_contract = validate_nyc_sales_contracts(

@@ -28,6 +28,7 @@ from sqlalchemy import (
     Text,
     Index,
     Boolean,
+    text,
 )
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
@@ -137,6 +138,7 @@ class Sales(Base):
     # ==========================================================================
     property_segment = Column(String(20))  # SINGLE_FAMILY, WALKUP, ELEVATOR, SMALL_MULTI
     price_tier = Column(String(10))  # entry, core, premium, luxury (within-segment quartile)
+    price_tier_proxy = Column(String(10))  # non-leaky inference-time proxy for routing
     
     # ==========================================================================
     # DERIVED FEATURES (computed during ETL)
@@ -145,6 +147,10 @@ class Sales(Base):
     price_per_sqft = Column(Float)  # sale_price / gross_square_feet (for comps display)
     sale_month = Column(Integer)  # 1-12 for seasonality
     sale_quarter = Column(Integer)  # 1-4 for seasonality
+    days_since_2019_start = Column(Float)  # trend proxy derived from sale_date
+    month_sin = Column(Float)  # cyclical month encoding
+    month_cos = Column(Float)  # cyclical month encoding
+    rate_regime_bucket = Column(String(32))  # coarse temporal regime label
     
     # ==========================================================================
     # IMPUTATION TRACKING (for transparency - see docs/DATA_QUALITY_LOG.md)
@@ -162,6 +168,7 @@ class Sales(Base):
         Index('ix_sales_coords', 'latitude', 'longitude'),
         Index('ix_sales_price_range', 'sale_price', 'sale_year'),
         Index('ix_sales_property_segment', 'property_segment', 'price_tier'),
+        Index('ix_sales_property_segment_proxy', 'property_segment', 'price_tier_proxy'),
         Index('ix_sales_property_history', 'property_id', 'sale_date'),
     )
     
@@ -255,6 +262,14 @@ class ModelPerformance(Base):
 def create_tables():
     """Create all tables in the database."""
     Base.metadata.create_all(bind=engine, checkfirst=True)
+    # Lightweight forward-compat migration for existing dev DBs.
+    with engine.begin() as conn:
+        conn.execute(text("ALTER TABLE sales ADD COLUMN IF NOT EXISTS price_tier_proxy VARCHAR(10)"))
+        conn.execute(text("CREATE INDEX IF NOT EXISTS ix_sales_property_segment_proxy ON sales (property_segment, price_tier_proxy)"))
+        conn.execute(text("ALTER TABLE sales ADD COLUMN IF NOT EXISTS days_since_2019_start DOUBLE PRECISION"))
+        conn.execute(text("ALTER TABLE sales ADD COLUMN IF NOT EXISTS month_sin DOUBLE PRECISION"))
+        conn.execute(text("ALTER TABLE sales ADD COLUMN IF NOT EXISTS month_cos DOUBLE PRECISION"))
+        conn.execute(text("ALTER TABLE sales ADD COLUMN IF NOT EXISTS rate_regime_bucket VARCHAR(32)"))
     print("✅ Database tables created successfully")
 
 

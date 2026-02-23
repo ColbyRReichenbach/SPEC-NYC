@@ -7,8 +7,11 @@ from typing import Any, Dict, Tuple
 import numpy as np
 import pandas as pd
 
+from src.price_tier_proxy import assign_price_tier_proxy
+
 ROUTE_DELIMITER = "||"
 MISSING_ROUTE_TOKEN = "__missing__"
+TREND_BASE_DATE = pd.Timestamp("2019-01-01")
 
 
 def get_model_strategy(artifact: Dict[str, Any]) -> str:
@@ -30,8 +33,15 @@ def get_router_column(artifact: Dict[str, Any]) -> str:
 def get_router_columns(artifact: Dict[str, Any]) -> list[str]:
     raw = artifact.get("router_columns", [])
     if isinstance(raw, list) and raw:
-        return [str(col) for col in raw]
-    return [get_router_column(artifact)]
+        out = [str(col) for col in raw]
+    else:
+        out = [get_router_column(artifact)]
+    normalized = [c.strip().lower() for c in out]
+    if "price_tier" in normalized:
+        raise ValueError(
+            "Routing on target-derived 'price_tier' is disallowed. Use non-leaky 'price_tier_proxy' instead."
+        )
+    return out
 
 
 def get_segment_pipelines(artifact: Dict[str, Any]) -> Dict[str, Any]:
@@ -95,6 +105,56 @@ def build_route_keys(frame: pd.DataFrame, router_columns: list[str]) -> pd.Serie
     return route_series.astype(str)
 
 
+def _with_router_columns(artifact: Dict[str, Any], frame: pd.DataFrame) -> pd.DataFrame:
+    """Ensure required routing columns are present using non-leaky fallback logic."""
+    router_columns = get_router_columns(artifact)
+    if "price_tier_proxy" not in router_columns or "price_tier_proxy" in frame.columns:
+        return frame
+
+    bins = artifact.get("price_tier_proxy_bins")
+    if isinstance(bins, dict):
+        out, _ = assign_price_tier_proxy(frame, bins=bins, segment_col="property_segment")
+        return out
+
+    # Last-resort fallback for legacy artifacts without bins.
+    out = frame.copy()
+    out["price_tier_proxy"] = "core"
+    return out
+
+
+def _with_temporal_regime_features(frame: pd.DataFrame) -> pd.DataFrame:
+    """Derive temporal features when artifacts require them."""
+    out = frame.copy()
+    required = {"days_since_2019_start", "month_sin", "month_cos", "rate_regime_bucket"}
+    if required.issubset(set(out.columns)):
+        return out
+
+    sale_date = pd.to_datetime(out.get("sale_date"), errors="coerce") if "sale_date" in out.columns else pd.Series(pd.NaT, index=out.index)
+    month = sale_date.dt.month.fillna(1).astype(float)
+
+    if "days_since_2019_start" not in out.columns:
+        out["days_since_2019_start"] = (sale_date - TREND_BASE_DATE).dt.days.astype("float64")
+    if "month_sin" not in out.columns:
+        out["month_sin"] = np.sin(2.0 * np.pi * (month - 1.0) / 12.0).astype("float64")
+    if "month_cos" not in out.columns:
+        out["month_cos"] = np.cos(2.0 * np.pi * (month - 1.0) / 12.0).astype("float64")
+    if "rate_regime_bucket" not in out.columns:
+        out["rate_regime_bucket"] = np.select(
+            [
+                sale_date < pd.Timestamp("2020-03-01"),
+                sale_date < pd.Timestamp("2022-01-01"),
+                sale_date < pd.Timestamp("2024-01-01"),
+            ],
+            [
+                "pre_2020",
+                "pandemic_low_rate",
+                "post_hike_transition",
+            ],
+            default="high_rate_2024_plus",
+        )
+    return out
+
+
 def select_pipeline_for_route(
     artifact: Dict[str, Any],
     route_key: str,
@@ -116,7 +176,9 @@ def select_pipeline_for_route(
 
 def select_pipeline_for_row(artifact: Dict[str, Any], row: pd.Series) -> Tuple[Any, str]:
     router_columns = get_router_columns(artifact)
-    route_key = build_route_key_from_row(row, router_columns)
+    row_df = pd.DataFrame([row.to_dict()])
+    row_df = _with_router_columns(artifact, row_df)
+    route_key = build_route_key_from_row(row_df.iloc[0], router_columns)
     return select_pipeline_for_route(artifact, route_key)
 
 
@@ -135,6 +197,9 @@ def predict_dataframe(
     if frame.empty:
         empty_idx = frame.index
         return np.asarray([], dtype=float), pd.Series([], index=empty_idx, dtype=str)
+
+    frame = _with_router_columns(artifact, frame)
+    frame = _with_temporal_regime_features(frame)
 
     feature_columns = get_feature_columns(artifact)
     if not feature_columns:

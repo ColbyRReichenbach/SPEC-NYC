@@ -27,6 +27,7 @@ from src.evaluate import build_segment_scorecard, evaluate_predictions, mdape, s
 from src.explain import generate_shap_artifacts
 from src.inference import build_route_keys, predict_dataframe
 from src.mlops.track_run import get_git_sha, log_run
+from src.price_tier_proxy import assign_price_tier_proxy
 
 
 logger = logging.getLogger(__name__)
@@ -35,6 +36,7 @@ TARGET_COL = "sale_price"
 DATE_COL = "sale_date"
 MODEL_STRATEGIES = {"global", "segmented_router"}
 ROUTER_MODES = {"segment_only", "segment_plus_tier"}
+TREND_BASE_DATE = pd.Timestamp("2019-01-01")
 
 NUMERIC_FEATURES = [
     "gross_square_feet",
@@ -44,6 +46,9 @@ NUMERIC_FEATURES = [
     "total_units",
     "distance_to_center_km",
     "h3_price_lag",
+    "days_since_2019_start",
+    "month_sin",
+    "month_cos",
 ]
 
 CATEGORICAL_FEATURES = [
@@ -51,6 +56,7 @@ CATEGORICAL_FEATURES = [
     "building_class",
     "property_segment",
     "neighborhood",
+    "rate_regime_bucket",
 ]
 
 BASE_REQUIRED_COLUMNS = [
@@ -125,12 +131,37 @@ def load_training_data(input_csv: Path | None = None, limit: int | None = None) 
                 building_class,
                 property_segment,
                 price_tier,
+                price_tier_proxy,
                 neighborhood
             FROM sales
             WHERE sale_price IS NOT NULL
               AND sale_date IS NOT NULL
         """
-        df = pd.read_sql(query, engine)
+        try:
+            df = pd.read_sql(query, engine)
+        except Exception as exc:
+            logger.warning("Falling back to legacy sales schema (without price_tier_proxy): %s", exc)
+            legacy_query = """
+                SELECT
+                    sale_date,
+                    sale_price,
+                    h3_index,
+                    gross_square_feet,
+                    year_built,
+                    building_age,
+                    residential_units,
+                    total_units,
+                    distance_to_center_km,
+                    borough,
+                    building_class,
+                    property_segment,
+                    price_tier,
+                    neighborhood
+                FROM sales
+                WHERE sale_price IS NOT NULL
+                  AND sale_date IS NOT NULL
+            """
+            df = pd.read_sql(legacy_query, engine)
 
     if limit is not None:
         df = df.head(limit).copy()
@@ -184,6 +215,64 @@ def add_h3_price_lag(train_df: pd.DataFrame, test_df: pd.DataFrame) -> Tuple[pd.
     train_df["h3_price_lag"] = train_df["h3_index"].map(h3_median).fillna(global_median)
     test_df["h3_price_lag"] = test_df["h3_index"].map(h3_median).fillna(global_median)
     return train_df, test_df
+
+
+def add_temporal_regime_features(train_df: pd.DataFrame, test_df: pd.DataFrame) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    """Create leakage-safe time/regime features from sale_date only."""
+    train = train_df.copy()
+    test = test_df.copy()
+    for frame in (train, test):
+        sale_date = pd.to_datetime(frame[DATE_COL], errors="coerce")
+        month = sale_date.dt.month
+        frame["days_since_2019_start"] = (sale_date - TREND_BASE_DATE).dt.days.astype("float64")
+        radians = 2.0 * np.pi * (month.fillna(1).astype(float) - 1.0) / 12.0
+        frame["month_sin"] = np.sin(radians).astype("float64")
+        frame["month_cos"] = np.cos(radians).astype("float64")
+        frame["rate_regime_bucket"] = np.select(
+            [
+                sale_date < pd.Timestamp("2020-03-01"),
+                sale_date < pd.Timestamp("2022-01-01"),
+                sale_date < pd.Timestamp("2024-01-01"),
+            ],
+            [
+                "pre_2020",
+                "pandemic_low_rate",
+                "post_hike_transition",
+            ],
+            default="high_rate_2024_plus",
+        )
+    return train, test
+
+
+def build_temporal_scorecard(
+    eval_df: pd.DataFrame,
+    *,
+    period_freq: str = "Q",
+) -> pd.DataFrame:
+    """Compute time-slice diagnostics over chronological periods."""
+    if eval_df.empty or DATE_COL not in eval_df.columns:
+        return pd.DataFrame(columns=["period", "n", "ppe10", "mdape", "r2"])
+
+    frame = eval_df.copy()
+    frame[DATE_COL] = pd.to_datetime(frame[DATE_COL], errors="coerce")
+    frame = frame.dropna(subset=[DATE_COL, TARGET_COL, "predicted_price"])
+    if frame.empty:
+        return pd.DataFrame(columns=["period", "n", "ppe10", "mdape", "r2"])
+
+    frame["period"] = frame[DATE_COL].dt.to_period(period_freq).astype(str)
+    rows = []
+    for period, gdf in frame.groupby("period"):
+        metrics = evaluate_predictions(gdf)["overall"]
+        rows.append(
+            {
+                "period": period,
+                "n": int(metrics["n"]),
+                "ppe10": float(metrics["ppe10"]),
+                "mdape": float(metrics["mdape"]),
+                "r2": float(metrics["r2"]),
+            }
+        )
+    return pd.DataFrame(rows).sort_values("period").reset_index(drop=True)
 
 
 def _make_one_hot_encoder() -> OneHotEncoder:
@@ -337,6 +426,22 @@ def train_model(df: pd.DataFrame, config: TrainConfig) -> dict:
     frame = prepare_training_frame(df)
     train_df, test_df = time_split(frame, config.test_size)
     train_df, test_df = add_h3_price_lag(train_df, test_df)
+    train_df, test_df = add_temporal_regime_features(train_df, test_df)
+    price_tier_proxy_bins: dict | None = None
+
+    if strategy == "segmented_router" and router_mode == "segment_plus_tier":
+        # Fit on train only; apply to test with fixed bins to avoid temporal leakage.
+        train_df, price_tier_proxy_bins = assign_price_tier_proxy(
+            train_df,
+            segment_col="property_segment",
+            min_segment_rows=config.min_segment_rows,
+        )
+        test_df, _ = assign_price_tier_proxy(
+            test_df,
+            bins=price_tier_proxy_bins,
+            segment_col="property_segment",
+            min_segment_rows=config.min_segment_rows,
+        )
 
     best_params = tune_hyperparameters(train_df, config.random_state, config.optuna_trials)
 
@@ -375,6 +480,7 @@ def train_model(df: pd.DataFrame, config: TrainConfig) -> dict:
         "segment_pipelines": segment_pipelines,
         "router_mode": router_mode,
         "router_columns": router_columns,
+        "price_tier_proxy_bins": price_tier_proxy_bins,
         "router_column": router_columns[0],  # backward compatibility
         "pipeline": fallback_pipeline,  # backward compatibility
     }
@@ -407,6 +513,8 @@ def train_model(df: pd.DataFrame, config: TrainConfig) -> dict:
         "best_params": best_params,
         "segment_ppe10_variance": segment_ppe10_variance,
         "segment_variance_flag_v2": segment_variance_flag_v2,
+        "dataset_version": config.dataset_version,
+        "price_tier_proxy_bins_version": (price_tier_proxy_bins or {}).get("version"),
     }
     if segment_variance_flag_v2:
         logger.warning("Segment PPE10 variance %.3f exceeds 0.15. Flagging V2 segment-specific models.", segment_ppe10_variance)
@@ -419,6 +527,7 @@ def train_model(df: pd.DataFrame, config: TrainConfig) -> dict:
     metrics_path = MODELS_DIR / f"metrics_{artifact_stem}.json"
     scorecard_path = report_dir / f"segment_scorecard_{artifact_stem}.csv"
     predictions_path = report_dir / f"evaluation_predictions_{artifact_stem}.csv"
+    temporal_scorecard_path = report_dir / f"temporal_scorecard_{artifact_stem}.csv"
 
     artifact = {
         "pipeline": fallback_pipeline,  # backward compatibility with legacy readers
@@ -432,6 +541,7 @@ def train_model(df: pd.DataFrame, config: TrainConfig) -> dict:
         "feature_columns": NUMERIC_FEATURES + CATEGORICAL_FEATURES,
         "numeric_features": NUMERIC_FEATURES,
         "categorical_features": CATEGORICAL_FEATURES,
+        "price_tier_proxy_bins": price_tier_proxy_bins,
         "model_version": config.model_version,
         "artifact_tag": artifact_tag,
         "trained_at_utc": datetime.utcnow().isoformat(),
@@ -439,11 +549,31 @@ def train_model(df: pd.DataFrame, config: TrainConfig) -> dict:
     joblib.dump(artifact, model_path)
     save_metrics(metrics, metrics_path)
     build_segment_scorecard(eval_df).to_csv(scorecard_path, index=False)
+    temporal_scorecard = build_temporal_scorecard(eval_df)
+    temporal_scorecard.to_csv(temporal_scorecard_path, index=False)
     eval_df.to_csv(predictions_path, index=False)
+
+    if not temporal_scorecard.empty:
+        metrics["metadata"]["temporal_period_freq"] = "Q"
+        metrics["metadata"]["temporal_period_count"] = int(len(temporal_scorecard))
+        metrics["metadata"]["temporal_mdape_std"] = float(temporal_scorecard["mdape"].std(ddof=0))
+        metrics["metadata"]["temporal_ppe10_std"] = float(temporal_scorecard["ppe10"].std(ddof=0))
+        metrics["metadata"]["temporal_ppe10_min"] = float(temporal_scorecard["ppe10"].min())
+        metrics["metadata"]["temporal_ppe10_max"] = float(temporal_scorecard["ppe10"].max())
+        metrics["metadata"]["temporal_mdape_min"] = float(temporal_scorecard["mdape"].min())
+        metrics["metadata"]["temporal_mdape_max"] = float(temporal_scorecard["mdape"].max())
+        metrics["metadata"]["temporal_mdape_last_minus_first"] = float(
+            temporal_scorecard["mdape"].iloc[-1] - temporal_scorecard["mdape"].iloc[0]
+        )
+        metrics["metadata"]["temporal_ppe10_last_minus_first"] = float(
+            temporal_scorecard["ppe10"].iloc[-1] - temporal_scorecard["ppe10"].iloc[0]
+        )
+        save_metrics(metrics, metrics_path)
 
     logger.info("Saved model artifact: %s", model_path)
     logger.info("Saved metrics artifact: %s", metrics_path)
     logger.info("Saved segment scorecard: %s", scorecard_path)
+    logger.info("Saved temporal scorecard: %s", temporal_scorecard_path)
     logger.info("Saved evaluation predictions: %s", predictions_path)
 
     shap_artifacts = {}
@@ -484,6 +614,7 @@ def train_model(df: pd.DataFrame, config: TrainConfig) -> dict:
         "metrics_path": str(metrics_path),
         "scorecard_path": str(scorecard_path),
         "predictions_path": str(predictions_path),
+        "temporal_scorecard_path": str(temporal_scorecard_path),
         "artifact_tag": artifact_tag,
         "metrics": metrics,
         "shap_artifacts": shap_artifacts,
