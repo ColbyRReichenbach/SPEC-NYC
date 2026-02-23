@@ -28,8 +28,10 @@ import numpy as np
 import pandas as pd
 from sqlalchemy import text
 
+from src.canonical import to_canonical, validate_canonical_contracts, write_mapping_report
+from src.datasources import get_datasource
 from src.database import Sales, create_tables, get_session
-from src.validation.data_contracts import DataContractResult, validate_data_contracts
+from src.validation.data_contracts import DataContractResult, validate_nyc_sales_contracts
 
 # Configure logging
 logging.basicConfig(
@@ -792,6 +794,10 @@ def run_etl(
     write_report: bool = False,
     replace_sales: bool = False,
     report_tag: str | None = None,
+    data_source: str = "csv",
+    datasource_config_path: Path | None = None,
+    mapping_yaml: Path | None = None,
+    contract_profile: str = "nyc",
 ) -> pd.DataFrame:
     """Execute the full ETL pipeline."""
     logger.info("=" * 60)
@@ -804,17 +810,30 @@ def run_etl(
 
     try:
         # 1. Extract
-        df = load_raw_data(input_path)
+        datasource = get_datasource(data_source, input_path=input_path, config_path=datasource_config_path)
+        raw_extract = datasource.extract(limit=limit)
+        df = raw_extract.df
         if limit is not None:
-            df = df.head(limit).copy()
             logger.info(f"Applied deterministic row limit: {limit:,}")
         _record_stage(stage_stats, "extract_raw", df)
+
+        if contract_profile == "canonical":
+            df, mapping_report = to_canonical(df, mapping_yaml)
+            _record_stage(stage_stats, "canonicalized", df)
+            canonical_contract = validate_canonical_contracts(df, raise_on_error=True)
+            contract_results.append(("canonical", canonical_contract))
+            if write_report:
+                report_tag_value = report_tag or ("dryrun" if dry_run else "prod")
+                write_mapping_report(
+                    mapping_report,
+                    REPORTS_DATA_DIR / f"canonical_mapping_{datetime.utcnow().strftime('%Y%m%d')}_{report_tag_value}.json",
+                )
 
         # 2. Clean
         df = clean_data(df)
         _record_stage(stage_stats, "cleaned", df)
 
-        clean_contract = validate_data_contracts(
+        clean_contract = validate_nyc_sales_contracts(
             df,
             required_columns=RAW_CONTRACT_REQUIRED_COLUMNS,
             max_freshness_days=730,
@@ -843,7 +862,7 @@ def run_etl(
         df = feature_engineering(df)
         _record_stage(stage_stats, "feature_engineered", df)
 
-        final_contract = validate_data_contracts(
+        final_contract = validate_nyc_sales_contracts(
             df,
             null_thresholds=POST_ETL_NULL_THRESHOLDS,
             max_freshness_days=730,
@@ -939,6 +958,30 @@ if __name__ == "__main__":
         default=None,
         help="Optional artifact tag suffix for ETL report files (e.g., prod, smoke, w6_smoke)",
     )
+    parser.add_argument(
+        "--data-source",
+        choices=("csv", "nyc_open_data", "postgres"),
+        default="csv",
+        help="Raw extraction backend.",
+    )
+    parser.add_argument(
+        "--datasource-config-path",
+        type=Path,
+        default=None,
+        help="Optional JSON config for datasource settings (query/start_year/etc).",
+    )
+    parser.add_argument(
+        "--mapping-yaml",
+        type=Path,
+        default=None,
+        help="Optional mapping file used when contract-profile=canonical.",
+    )
+    parser.add_argument(
+        "--contract-profile",
+        choices=("nyc", "canonical"),
+        default="nyc",
+        help="Validation profile before NYC-specific cleaning logic.",
+    )
     args = parser.parse_args()
 
     run_etl(
@@ -948,4 +991,8 @@ if __name__ == "__main__":
         write_report=args.write_report,
         replace_sales=args.replace_sales,
         report_tag=args.report_tag,
+        data_source=args.data_source,
+        datasource_config_path=args.datasource_config_path,
+        mapping_yaml=args.mapping_yaml,
+        contract_profile=args.contract_profile,
     )

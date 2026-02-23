@@ -359,6 +359,7 @@ def evaluate_gates(checks: List[CheckResult], *, mode: str = "smoke") -> Dict[st
                 "docker_compose_up_db",
                 "db_connectivity",
                 "db_schema_create",
+                "canonicalization_smoke",
                 "etl_smoke",
             ],
             "Gate B (Model)": ["model_smoke", "evaluate_smoke", "explain_smoke", "artifact_inventory"],
@@ -729,24 +730,29 @@ def _run_smoke_checks(args: argparse.Namespace, *, db_env: Dict[str, str], smoke
     checks.append(
         run_command(
             "db_connectivity",
-            (
-                "python3 -c \"from sqlalchemy import create_engine,text; "
-                "import os; "
-                "e=create_engine(os.environ['DATABASE_URL']); "
-                "conn=e.connect(); conn.execute(text('SELECT 1')); conn.close(); print('db_ok')\""
-            ),
+            "python3 -c \"from sqlalchemy import create_engine,text; import os; e=create_engine(os.environ['DATABASE_URL']); conn=e.connect(); conn.execute(text('SELECT 1')); conn.close(); print('db_ok')\"",
             timeout_sec=60,
             env_overrides=db_env,
         )
     )
     checks.append(run_command("db_schema_create", "python3 -m src.database create", timeout_sec=120, env_overrides=db_env))
-    checks.append(
-        run_command(
-            "etl_smoke",
-            f"python3 -m src.etl --input {etl_input} --limit 220 --dry-run --write-report --report-tag w6_smoke",
-            timeout_sec=240,
-        )
+    try:
+        import pandas as pd
+        from src.canonical import to_canonical, validate_canonical_contracts
+
+        canonical_df, _ = to_canonical(pd.read_csv(etl_input), args.mapping_yaml)
+        validate_canonical_contracts(canonical_df)
+        checks.append(CheckResult(name="canonicalization_smoke", status="pass", detail="canonical contracts passed"))
+    except Exception as exc:
+        checks.append(CheckResult(name="canonicalization_smoke", status="fail", detail=f"canonicalization failed: {exc}"))
+
+    etl_cmd = (
+        f"python3 -m src.etl --input {etl_input} --limit 220 --dry-run --write-report --report-tag w6_smoke "
+        f"--data-source {args.data_source} --contract-profile {args.contract_profile}"
     )
+    if args.mapping_yaml:
+        etl_cmd += f" --mapping-yaml {args.mapping_yaml}"
+    checks.append(run_command("etl_smoke", etl_cmd, timeout_sec=240))
     checks.append(
         run_command(
             "model_smoke",
@@ -967,6 +973,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--arena-policy-path", type=Path, default=Path("config/arena_policy.yaml"))
     parser.add_argument("--arena-dir", type=Path, default=Path("reports/arena"))
     parser.add_argument("--streamlit-port", type=int, default=8504)
+    parser.add_argument("--data-source", choices=("csv", "nyc_open_data", "postgres"), default="csv")
+    parser.add_argument("--contract-profile", choices=("nyc", "canonical"), default="nyc")
+    parser.add_argument("--mapping-yaml", type=Path, default=Path("src/datasources/mappings/spec_nyc_v1.yaml"))
     parser.add_argument("--tag-release", action="store_true", help="Create git tag v1.0 when all gates are green.")
     return parser
 
