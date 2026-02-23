@@ -1,0 +1,7 @@
+rename:
+  building_class_at_time_of: building_class
+  census_tract_2020: census_tract
+defaults:
+  property_segment: UNKNOWN
+  gross_square_feet: 0
+  year_built: 0

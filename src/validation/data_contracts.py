@@ -57,7 +57,7 @@ class DataContractError(ValueError):
     """Raised when one or more contract checks fail."""
 
 
-def validate_data_contracts(
+def validate_nyc_sales_contracts(
     df: pd.DataFrame,
     *,
     required_columns: Optional[Iterable[str]] = None,
@@ -68,7 +68,7 @@ def validate_data_contracts(
     raise_on_error: bool = True,
 ) -> DataContractResult:
     """
-    Execute ETL data-contract checks and optionally raise on failure.
+    Execute NYC-sales ETL data-contract checks and optionally raise on failure.
 
     Checks:
     - required schema columns
@@ -102,6 +102,11 @@ def validate_data_contracts(
         raise DataContractError(format_contract_violations(result.violations))
 
     return result
+
+
+def validate_data_contracts(*args, **kwargs) -> DataContractResult:
+    """Backward-compatible alias for NYC-specific contracts."""
+    return validate_nyc_sales_contracts(*args, **kwargs)
 
 
 def format_contract_violations(violations: List[ContractViolation]) -> str:

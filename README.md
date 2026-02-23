@@ -127,6 +127,26 @@ Tracked in:
 - `docs/hypotheses/FEATURE_BACKLOG.md`
 - `docs/hypotheses/HYPOTHESIS_BACKLOG.md`
 
+
+## Codex Agentic Extension (Azuli.ai Internship Readiness)
+
+To support low-touch, agentic project delivery in Codex for unknown incoming data schemas, see:
+- `docs/CODEX_AUTONOMY_SETUP.md`
+- `docs/AVM_BUSINESS_LOGIC.md`
+
+These documents define:
+- autonomous role handoffs and loop controls,
+- schema-adaptive ingestion strategy,
+- AVM domain/business logic for robust modeling decisions,
+- branding-oriented frontend delivery guidance for Azuli-style demos.
+
+Implemented scaffold now includes:
+- Codex control plane and role/workflow/checklist prompts (`.codex/`).
+- Pluggable data-source registry and adapters (`src/datasources/`).
+- Canonical AVM schema + canonicalization + portable contracts (`src/canonical/`).
+- ETL/validator CLI options for `--data-source`, `--mapping-yaml`, and `--contract-profile`.
+- Autopilot loop runner for low-HITL validation/repair cycles (`scripts/autonomy_loop.sh`, `.codex/workflows/60_autopilot_loop.md`).
+
 ## Project Positioning
 
 This repo is the NYC production-data progression of my earlier S.P.E.C. valuation work. The emphasis here is less on demo UI and more on end-to-end DS execution quality, model governance, and reproducible MLOps behavior.
