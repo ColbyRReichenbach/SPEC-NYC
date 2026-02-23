@@ -58,6 +58,14 @@ data/raw/
 Thumbs.db
 .agent/
 
+# ----- Node / Frontend -----
+node_modules/
+web/.next/
+web/.turbo/
+web/coverage/
+web/.eslintcache
+*.tsbuildinfo
+
 # ----- Claude Code Config (Track agents and commands) -----
 # Note: .claude/ is tracked for agent definitions
 

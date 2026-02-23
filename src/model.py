@@ -25,7 +25,13 @@ from config.settings import MODEL_CONFIG, MODELS_DIR
 from src.database import engine
 from src.evaluate import build_segment_scorecard, evaluate_predictions, mdape, save_metrics
 from src.explain import generate_shap_artifacts
-from src.inference import build_route_keys, predict_dataframe
+from src.inference import (
+    build_route_keys,
+    predict_dataframe,
+    validate_feature_columns_for_inference,
+    validate_router_columns_for_inference,
+)
+from src.monitoring.drift import calculate_ks, calculate_psi
 from src.mlops.track_run import get_git_sha, log_run
 from src.price_tier_proxy import assign_price_tier_proxy
 
@@ -275,6 +281,185 @@ def build_temporal_scorecard(
     return pd.DataFrame(rows).sort_values("period").reset_index(drop=True)
 
 
+def validate_training_feature_contract(
+    train_df: pd.DataFrame,
+    test_df: pd.DataFrame,
+    *,
+    feature_columns: list[str],
+    router_columns: list[str],
+) -> None:
+    """
+    Ensure training uses only inference-safe, non-leaky features and routing keys.
+    """
+    validate_feature_columns_for_inference(feature_columns, context="training feature columns")
+    if router_columns:
+        validate_router_columns_for_inference(router_columns, context="training router columns")
+
+    required = sorted(set(feature_columns + router_columns))
+    missing_train = [col for col in required if col not in train_df.columns]
+    missing_test = [col for col in required if col not in test_df.columns]
+    if missing_train or missing_test:
+        raise ValueError(
+            "Training feature contract violated: missing required columns "
+            f"(train={missing_train}, test={missing_test})."
+        )
+
+    all_null = [col for col in feature_columns if train_df[col].isna().all()]
+    if all_null:
+        raise ValueError(f"Training feature contract violated: all-null feature columns in train split: {all_null}")
+
+
+def build_feature_missingness_by_segment_time(
+    df: pd.DataFrame,
+    *,
+    feature_columns: list[str],
+    segment_col: str = "property_segment",
+    date_col: str = DATE_COL,
+    period_freq: str = "Q",
+) -> pd.DataFrame:
+    """Compute per-feature missingness across segment x time slices."""
+    cols = ["segment", "period", "feature", "n", "missing_n", "missing_rate"]
+    if df.empty:
+        return pd.DataFrame(columns=cols)
+
+    frame = df.copy()
+    frame[date_col] = pd.to_datetime(frame[date_col], errors="coerce")
+    frame["period"] = frame[date_col].dt.to_period(period_freq).astype("string").fillna("unknown")
+    frame["segment"] = frame.get(segment_col, "UNKNOWN").astype("string").fillna("UNKNOWN")
+
+    rows = []
+    for (segment, period), gdf in frame.groupby(["segment", "period"], dropna=False):
+        n = int(len(gdf))
+        if n == 0:
+            continue
+        for feature in feature_columns:
+            missing_n = int(gdf[feature].isna().sum()) if feature in gdf.columns else n
+            rows.append(
+                {
+                    "segment": str(segment),
+                    "period": str(period),
+                    "feature": feature,
+                    "n": n,
+                    "missing_n": missing_n,
+                    "missing_rate": float(missing_n / max(n, 1)),
+                }
+            )
+    return pd.DataFrame(rows, columns=cols).sort_values(["segment", "period", "feature"]).reset_index(drop=True)
+
+
+def _categorical_drift(reference: pd.Series, current: pd.Series) -> tuple[float, float]:
+    ref = reference.astype("string").fillna("__missing__")
+    cur = current.astype("string").fillna("__missing__")
+    if len(ref) == 0 or len(cur) == 0:
+        return float("nan"), float("nan")
+    ref_dist = ref.value_counts(normalize=True)
+    cur_dist = cur.value_counts(normalize=True)
+    cats = sorted(set(ref_dist.index).union(set(cur_dist.index)))
+    tvd = 0.5 * sum(abs(float(cur_dist.get(c, 0.0)) - float(ref_dist.get(c, 0.0))) for c in cats)
+    unseen_rate = float((~cur.isin(set(ref_dist.index))).mean())
+    return float(tvd), unseen_rate
+
+
+def build_feature_drift_by_segment_time(
+    train_df: pd.DataFrame,
+    test_df: pd.DataFrame,
+    *,
+    feature_columns: list[str],
+    segment_col: str = "property_segment",
+    date_col: str = DATE_COL,
+    period_freq: str = "Q",
+) -> pd.DataFrame:
+    """Compute train-vs-test drift diagnostics by segment and test period."""
+    cols = [
+        "segment",
+        "period",
+        "feature",
+        "feature_type",
+        "baseline_scope",
+        "reference_n",
+        "current_n",
+        "missing_rate_train",
+        "missing_rate_test",
+        "psi",
+        "ks",
+        "cat_tvd",
+        "cat_unseen_rate",
+        "status",
+    ]
+    if train_df.empty or test_df.empty:
+        return pd.DataFrame(columns=cols)
+
+    train = train_df.copy()
+    test = test_df.copy()
+    train[date_col] = pd.to_datetime(train[date_col], errors="coerce")
+    test[date_col] = pd.to_datetime(test[date_col], errors="coerce")
+    train["segment"] = train.get(segment_col, "UNKNOWN").astype("string").fillna("UNKNOWN")
+    test["segment"] = test.get(segment_col, "UNKNOWN").astype("string").fillna("UNKNOWN")
+    test["period"] = test[date_col].dt.to_period(period_freq).astype("string").fillna("unknown")
+
+    rows = []
+    for (segment, period), cur_slice in test.groupby(["segment", "period"], dropna=False):
+        seg_ref = train[train["segment"] == segment]
+        ref_scope = "segment"
+        if len(seg_ref) < 40:
+            seg_ref = train
+            ref_scope = "global_fallback"
+
+        for feature in feature_columns:
+            ref = seg_ref[feature] if feature in seg_ref.columns else pd.Series(dtype="float64")
+            cur = cur_slice[feature] if feature in cur_slice.columns else pd.Series(dtype="float64")
+            ref_n = int(ref.notna().sum())
+            cur_n = int(cur.notna().sum())
+            missing_train = 1.0 if len(seg_ref) == 0 else float(ref.isna().mean())
+            missing_test = 1.0 if len(cur_slice) == 0 else float(cur.isna().mean())
+            is_numeric = pd.api.types.is_numeric_dtype(ref) and pd.api.types.is_numeric_dtype(cur)
+
+            psi = float("nan")
+            ks = float("nan")
+            cat_tvd = float("nan")
+            cat_unseen = float("nan")
+            status = "ok"
+            if is_numeric:
+                psi = calculate_psi(ref, cur)
+                ks = calculate_ks(ref, cur)
+                if (not np.isnan(psi) and psi >= 0.25) or (not np.isnan(ks) and ks >= 0.20):
+                    status = "alert"
+                elif (not np.isnan(psi) and psi >= 0.10) or (not np.isnan(ks) and ks >= 0.10):
+                    status = "warn"
+            else:
+                cat_tvd, cat_unseen = _categorical_drift(ref, cur)
+                if (not np.isnan(cat_tvd) and cat_tvd >= 0.35) or (not np.isnan(cat_unseen) and cat_unseen >= 0.20):
+                    status = "alert"
+                elif (not np.isnan(cat_tvd) and cat_tvd >= 0.20) or (not np.isnan(cat_unseen) and cat_unseen >= 0.10):
+                    status = "warn"
+
+            rows.append(
+                {
+                    "segment": str(segment),
+                    "period": str(period),
+                    "feature": feature,
+                    "feature_type": "numeric" if is_numeric else "categorical",
+                    "baseline_scope": ref_scope,
+                    "reference_n": ref_n,
+                    "current_n": cur_n,
+                    "missing_rate_train": missing_train,
+                    "missing_rate_test": missing_test,
+                    "psi": psi,
+                    "ks": ks,
+                    "cat_tvd": cat_tvd,
+                    "cat_unseen_rate": cat_unseen,
+                    "status": status,
+                }
+            )
+    order = {"alert": 0, "warn": 1, "ok": 2}
+    out = pd.DataFrame(rows, columns=cols)
+    if out.empty:
+        return out
+    out["__order"] = out["status"].map(order).fillna(3)
+    out = out.sort_values(["__order", "segment", "period", "feature"]).drop(columns="__order").reset_index(drop=True)
+    return out
+
+
 def _make_one_hot_encoder() -> OneHotEncoder:
     try:
         return OneHotEncoder(handle_unknown="ignore")
@@ -428,6 +613,7 @@ def train_model(df: pd.DataFrame, config: TrainConfig) -> dict:
     train_df, test_df = add_h3_price_lag(train_df, test_df)
     train_df, test_df = add_temporal_regime_features(train_df, test_df)
     price_tier_proxy_bins: dict | None = None
+    router_columns = _router_columns_for_mode(router_mode) if strategy == "segmented_router" else []
 
     if strategy == "segmented_router" and router_mode == "segment_plus_tier":
         # Fit on train only; apply to test with fixed bins to avoid temporal leakage.
@@ -443,11 +629,18 @@ def train_model(df: pd.DataFrame, config: TrainConfig) -> dict:
             min_segment_rows=config.min_segment_rows,
         )
 
+    feature_columns = NUMERIC_FEATURES + CATEGORICAL_FEATURES
+    validate_training_feature_contract(
+        train_df,
+        test_df,
+        feature_columns=feature_columns,
+        router_columns=router_columns,
+    )
+
     best_params = tune_hyperparameters(train_df, config.random_state, config.optuna_trials)
 
     logger.info("Training strategy '%s' on %s rows", strategy, len(train_df))
     if strategy == "segmented_router":
-        router_columns = _router_columns_for_mode(router_mode)
         missing_router_cols = [c for c in router_columns if c not in train_df.columns]
         if missing_router_cols:
             if router_mode == "segment_plus_tier" and "price_tier_proxy" in missing_router_cols and "price_tier" in train_df.columns:
@@ -465,9 +658,9 @@ def train_model(df: pd.DataFrame, config: TrainConfig) -> dict:
             route_keys=train_route_keys,
         )
     else:
-        router_columns = ["property_segment"]
+        router_columns = []
         fallback_pipeline = build_pipeline(best_params, random_state=config.random_state)
-        x_train = train_df[NUMERIC_FEATURES + CATEGORICAL_FEATURES]
+        x_train = train_df[feature_columns]
         y_train = train_df[TARGET_COL]
         fallback_pipeline.fit(x_train, y_train)
         segment_pipelines = {}
@@ -475,13 +668,13 @@ def train_model(df: pd.DataFrame, config: TrainConfig) -> dict:
     eval_df = test_df.copy()
     prediction_artifact = {
         "model_strategy": strategy,
-        "feature_columns": NUMERIC_FEATURES + CATEGORICAL_FEATURES,
+        "feature_columns": feature_columns,
         "fallback_pipeline": fallback_pipeline,
         "segment_pipelines": segment_pipelines,
         "router_mode": router_mode,
         "router_columns": router_columns,
         "price_tier_proxy_bins": price_tier_proxy_bins,
-        "router_column": router_columns[0],  # backward compatibility
+        "router_column": (router_columns or ["property_segment"])[0],  # backward compatibility
         "pipeline": fallback_pipeline,  # backward compatibility
     }
     preds, routes = predict_dataframe(prediction_artifact, eval_df)
@@ -505,10 +698,10 @@ def train_model(df: pd.DataFrame, config: TrainConfig) -> dict:
         "test_rows": int(len(test_df)),
         "model_strategy": strategy,
         "router_mode": router_mode,
-        "router_columns": router_columns,
+        "router_columns": router_columns or ["property_segment"],
         "min_segment_rows": int(config.min_segment_rows),
         "segment_model_count": int(len(segment_pipelines)),
-        "feature_columns": NUMERIC_FEATURES + CATEGORICAL_FEATURES,
+        "feature_columns": feature_columns,
         "optuna_trials": int(config.optuna_trials),
         "best_params": best_params,
         "segment_ppe10_variance": segment_ppe10_variance,
@@ -528,17 +721,19 @@ def train_model(df: pd.DataFrame, config: TrainConfig) -> dict:
     scorecard_path = report_dir / f"segment_scorecard_{artifact_stem}.csv"
     predictions_path = report_dir / f"evaluation_predictions_{artifact_stem}.csv"
     temporal_scorecard_path = report_dir / f"temporal_scorecard_{artifact_stem}.csv"
+    missingness_path = report_dir / f"feature_missingness_{artifact_stem}.csv"
+    drift_path = report_dir / f"feature_drift_segment_time_{artifact_stem}.csv"
 
     artifact = {
         "pipeline": fallback_pipeline,  # backward compatibility with legacy readers
         "fallback_pipeline": fallback_pipeline,
         "segment_pipelines": segment_pipelines,
         "router_mode": router_mode,
-        "router_columns": router_columns,
-        "router_column": router_columns[0],  # backward compatibility
+        "router_columns": router_columns or ["property_segment"],
+        "router_column": (router_columns or ["property_segment"])[0],  # backward compatibility
         "model_strategy": strategy,
         "min_segment_rows": int(config.min_segment_rows),
-        "feature_columns": NUMERIC_FEATURES + CATEGORICAL_FEATURES,
+        "feature_columns": feature_columns,
         "numeric_features": NUMERIC_FEATURES,
         "categorical_features": CATEGORICAL_FEATURES,
         "price_tier_proxy_bins": price_tier_proxy_bins,
@@ -551,7 +746,23 @@ def train_model(df: pd.DataFrame, config: TrainConfig) -> dict:
     build_segment_scorecard(eval_df).to_csv(scorecard_path, index=False)
     temporal_scorecard = build_temporal_scorecard(eval_df)
     temporal_scorecard.to_csv(temporal_scorecard_path, index=False)
+    feature_missingness = build_feature_missingness_by_segment_time(
+        eval_df,
+        feature_columns=feature_columns,
+    )
+    feature_missingness.to_csv(missingness_path, index=False)
+    feature_drift = build_feature_drift_by_segment_time(
+        train_df,
+        test_df,
+        feature_columns=feature_columns,
+    )
+    feature_drift.to_csv(drift_path, index=False)
     eval_df.to_csv(predictions_path, index=False)
+    metrics["metadata"]["feature_missingness_rows"] = int(len(feature_missingness))
+    metrics["metadata"]["feature_drift_rows"] = int(len(feature_drift))
+    metrics["metadata"]["feature_drift_alerts"] = int((feature_drift["status"] == "alert").sum()) if not feature_drift.empty else 0
+    metrics["metadata"]["feature_drift_warnings"] = int((feature_drift["status"] == "warn").sum()) if not feature_drift.empty else 0
+    save_metrics(metrics, metrics_path)
 
     if not temporal_scorecard.empty:
         metrics["metadata"]["temporal_period_freq"] = "Q"
@@ -574,6 +785,8 @@ def train_model(df: pd.DataFrame, config: TrainConfig) -> dict:
     logger.info("Saved metrics artifact: %s", metrics_path)
     logger.info("Saved segment scorecard: %s", scorecard_path)
     logger.info("Saved temporal scorecard: %s", temporal_scorecard_path)
+    logger.info("Saved feature missingness diagnostics: %s", missingness_path)
+    logger.info("Saved feature drift diagnostics: %s", drift_path)
     logger.info("Saved evaluation predictions: %s", predictions_path)
 
     shap_artifacts = {}
@@ -615,6 +828,8 @@ def train_model(df: pd.DataFrame, config: TrainConfig) -> dict:
         "scorecard_path": str(scorecard_path),
         "predictions_path": str(predictions_path),
         "temporal_scorecard_path": str(temporal_scorecard_path),
+        "missingness_path": str(missingness_path),
+        "drift_path": str(drift_path),
         "artifact_tag": artifact_tag,
         "metrics": metrics,
         "shap_artifacts": shap_artifacts,

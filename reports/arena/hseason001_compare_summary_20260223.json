@@ -1,0 +1,88 @@
+{
+  "overall": {
+    "champ": {
+      "n": 59092,
+      "mdape": 0.16366838465171193,
+      "ppe10": 0.32537399309551207
+    },
+    "candidate": {
+      "n": 59092,
+      "mdape": 0.2521219463629831,
+      "ppe10": 0.21840519867325525
+    },
+    "delta": {
+      "mdape": 0.08845356171127114,
+      "ppe10": -0.10696879442225682
+    }
+  },
+  "major_segments": [
+    {
+      "segment": "ELEVATOR",
+      "n": 25783,
+      "champ_mdape": 0.2224387658227848,
+      "cand_mdape": 0.3856162715517241,
+      "mdape_delta": 0.16317750572893933,
+      "champ_ppe10": 0.2285437269730463,
+      "cand_ppe10": 0.1446689679246015,
+      "ppe10_delta": -0.08387475904844482
+    },
+    {
+      "segment": "SINGLE_FAMILY",
+      "n": 25148,
+      "champ_mdape": 0.1088213793103448,
+      "cand_mdape": 0.1652571193542695,
+      "mdape_delta": 0.05643574004392471,
+      "champ_ppe10": 0.4585222301757735,
+      "cand_ppe10": 0.3121918243995546,
+      "ppe10_delta": -0.14633040577621886
+    },
+    {
+      "segment": "SMALL_MULTI",
+      "n": 3018,
+      "champ_mdape": 0.2380554731775328,
+      "cand_mdape": 0.352686923076923,
+      "mdape_delta": 0.1146314498993902,
+      "champ_ppe10": 0.2147117296222664,
+      "cand_ppe10": 0.1626905235255135,
+      "ppe10_delta": -0.0520212060967529
+    },
+    {
+      "segment": "WALKUP",
+      "n": 5143,
+      "champ_mdape": 0.2313428571428571,
+      "cand_mdape": 0.3279648295454545,
+      "mdape_delta": 0.09662197240259737,
+      "champ_ppe10": 0.2247715341240521,
+      "cand_ppe10": 0.1621621621621621,
+      "ppe10_delta": -0.06260937196189001
+    }
+  ],
+  "stability": {
+    "champ_quarters": 6,
+    "champ_mdape_std": 0.00462344873153278,
+    "champ_ppe10_std": 0.0065166711822553765,
+    "champ_mdape_min": 0.15491850000000001,
+    "champ_mdape_max": 0.16990169230769225,
+    "champ_ppe10_min": 0.31773012552301255,
+    "champ_ppe10_max": 0.3385774429426102,
+    "champ_first_period": "2023Q3",
+    "champ_last_period": "2024Q4",
+    "champ_mdape_first_last_delta": 0.00759571052631583,
+    "champ_ppe10_first_last_delta": -0.012126057729975659,
+    "cand_quarters": 6,
+    "cand_mdape_std": 0.010739472142233362,
+    "cand_ppe10_std": 0.007045506697894907,
+    "cand_mdape_min": 0.23951892201834862,
+    "cand_mdape_max": 0.271644140625,
+    "cand_ppe10_min": 0.2117329149232915,
+    "cand_ppe10_max": 0.2302237979171283,
+    "cand_first_period": "2023Q3",
+    "cand_last_period": "2024Q4",
+    "cand_mdape_first_last_delta": 0.014952427330720774,
+    "cand_ppe10_first_last_delta": -0.01803039752891583,
+    "delta_mdape_std": 0.006116023410700582,
+    "delta_ppe10_std": 0.0005288355156395303,
+    "delta_mdape_range": 0.017142026298959112,
+    "delta_ppe10_range": -0.0023564344257608616
+  }
+}

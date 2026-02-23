@@ -18,10 +18,16 @@ class TestInference(unittest.TestCase):
     def test_predict_dataframe_global(self):
         artifact = {
             "model_strategy": "global",
-            "feature_columns": ["f1", "f2"],
+            "feature_columns": ["gross_square_feet", "year_built"],
             "pipeline": _ConstantPipeline(111.0),
         }
-        frame = pd.DataFrame({"f1": [1, 2], "f2": [3, 4], "property_segment": ["A", "B"]})
+        frame = pd.DataFrame(
+            {
+                "gross_square_feet": [900.0, 1200.0],
+                "year_built": [1930, 1980],
+                "property_segment": ["SINGLE_FAMILY", "ELEVATOR"],
+            }
+        )
         preds, routes = predict_dataframe(artifact, frame)
         self.assertEqual(preds.tolist(), [111.0, 111.0])
         self.assertEqual(routes.tolist(), ["global", "global"])
@@ -29,7 +35,7 @@ class TestInference(unittest.TestCase):
     def test_predict_dataframe_segmented_router_with_fallback(self):
         artifact = {
             "model_strategy": "segmented_router",
-            "feature_columns": ["f1", "f2"],
+            "feature_columns": ["gross_square_feet", "year_built"],
             "fallback_pipeline": _ConstantPipeline(200.0),
             "segment_pipelines": {
                 "SINGLE_FAMILY": _ConstantPipeline(300.0),
@@ -38,8 +44,8 @@ class TestInference(unittest.TestCase):
         }
         frame = pd.DataFrame(
             {
-                "f1": [1, 2, 3],
-                "f2": [4, 5, 6],
+                "gross_square_feet": [850.0, 1100.0, 980.0],
+                "year_built": [1920, 1975, 1940],
                 "property_segment": ["SINGLE_FAMILY", "ELEVATOR", None],
             }
         )
@@ -50,12 +56,12 @@ class TestInference(unittest.TestCase):
     def test_predict_single_row_segmented_router(self):
         artifact = {
             "model_strategy": "segmented_router",
-            "feature_columns": ["f1"],
+            "feature_columns": ["gross_square_feet"],
             "fallback_pipeline": _ConstantPipeline(150.0),
             "segment_pipelines": {"WALKUP": _ConstantPipeline(175.0)},
             "router_column": "property_segment",
         }
-        row = pd.Series({"f1": 10, "property_segment": "WALKUP"})
+        row = pd.Series({"gross_square_feet": 950.0, "property_segment": "WALKUP"})
         pred, route = predict_single_row(artifact, row)
         self.assertEqual(pred, 175.0)
         self.assertEqual(route, "route:WALKUP")
@@ -63,7 +69,7 @@ class TestInference(unittest.TestCase):
     def test_predict_dataframe_segment_plus_tier_routes(self):
         artifact = {
             "model_strategy": "segmented_router",
-            "feature_columns": ["f1"],
+            "feature_columns": ["gross_square_feet"],
             "fallback_pipeline": _ConstantPipeline(90.0),
             "segment_pipelines": {
                 "SINGLE_FAMILY||entry": _ConstantPipeline(120.0),
@@ -74,7 +80,7 @@ class TestInference(unittest.TestCase):
         }
         frame = pd.DataFrame(
             {
-                "f1": [1, 2, 3],
+                "gross_square_feet": [900.0, 2200.0, 1100.0],
                 "property_segment": ["SINGLE_FAMILY", "SINGLE_FAMILY", "ELEVATOR"],
                 "price_tier_proxy": ["entry", "luxury", "entry"],
             }
@@ -89,7 +95,7 @@ class TestInference(unittest.TestCase):
     def test_predict_dataframe_segment_plus_tier_derives_proxy_at_inference_time(self):
         artifact = {
             "model_strategy": "segmented_router",
-            "feature_columns": ["f1"],
+            "feature_columns": ["gross_square_feet"],
             "fallback_pipeline": _ConstantPipeline(90.0),
             "segment_pipelines": {
                 "SINGLE_FAMILY||entry": _ConstantPipeline(120.0),
@@ -107,9 +113,8 @@ class TestInference(unittest.TestCase):
         }
         frame = pd.DataFrame(
             {
-                "f1": [1, 2],
-                "property_segment": ["SINGLE_FAMILY", "SINGLE_FAMILY"],
                 "gross_square_feet": [1.0, 10_000.0],
+                "property_segment": ["SINGLE_FAMILY", "SINGLE_FAMILY"],
                 "building_age": [90, 1],
                 "distance_to_center_km": [20.0, 0.2],
                 "total_units": [1, 4],
@@ -124,22 +129,32 @@ class TestInference(unittest.TestCase):
     def test_predict_dataframe_disallows_target_derived_price_tier_routing(self):
         artifact = {
             "model_strategy": "segmented_router",
-            "feature_columns": ["f1"],
+            "feature_columns": ["gross_square_feet"],
             "fallback_pipeline": _ConstantPipeline(90.0),
             "segment_pipelines": {"SINGLE_FAMILY||entry": _ConstantPipeline(120.0)},
             "router_columns": ["property_segment", "price_tier"],
         }
-        frame = pd.DataFrame({"f1": [1], "property_segment": ["SINGLE_FAMILY"], "price_tier": ["entry"]})
+        frame = pd.DataFrame({"gross_square_feet": [900.0], "property_segment": ["SINGLE_FAMILY"], "price_tier": ["entry"]})
         with self.assertRaises(ValueError):
             predict_dataframe(artifact, frame)
 
     def test_predict_dataframe_missing_required_features_raises(self):
         artifact = {
             "model_strategy": "global",
-            "feature_columns": ["f1", "f2"],
+            "feature_columns": ["gross_square_feet", "year_built"],
             "pipeline": _ConstantPipeline(111.0),
         }
-        frame = pd.DataFrame({"f1": [1]})
+        frame = pd.DataFrame({"gross_square_feet": [1000.0]})
+        with self.assertRaises(ValueError):
+            predict_dataframe(artifact, frame)
+
+    def test_predict_dataframe_disallows_target_derived_feature_columns(self):
+        artifact = {
+            "model_strategy": "global",
+            "feature_columns": ["gross_square_feet", "sale_price"],
+            "pipeline": _ConstantPipeline(111.0),
+        }
+        frame = pd.DataFrame({"gross_square_feet": [1000.0], "sale_price": [500000.0]})
         with self.assertRaises(ValueError):
             predict_dataframe(artifact, frame)
 

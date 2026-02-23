@@ -1,0 +1,15 @@
+{
+  "name": "spec-nyc",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "web",
+    "packages/*"
+  ],
+  "scripts": {
+    "frontend:lint": "npm run -w web lint",
+    "frontend:typecheck": "npm run -w web typecheck",
+    "frontend:test:contracts": "npm run -w web test:contracts",
+    "frontend:ci": "npm run frontend:lint && npm run frontend:typecheck && npm run frontend:test:contracts"
+  }
+}
