@@ -147,6 +147,110 @@ def load_model_artifact() -> Tuple[Optional[Dict[str, Any]], Optional[Path], Opt
         return None, path, f"Failed to load model artifact: {exc}"
 
 
+@st.cache_data(show_spinner=False)
+def load_latest_json(pattern: str) -> Tuple[Optional[Dict[str, Any]], Optional[Path]]:
+    path = _latest_file(pattern)
+    if path is None:
+        return None, None
+    try:
+        return json.loads(path.read_text(encoding="utf-8")), path
+    except Exception:
+        return None, path
+
+
+def render_governance_monitoring_story(
+    *,
+    metrics: Optional[Dict[str, Any]],
+    metadata: Dict[str, Any],
+    metrics_path: Optional[Path],
+    model_path: Optional[Path],
+    scorecard_path: Optional[Path],
+    eval_path: Optional[Path],
+) -> None:
+    proposal_payload, proposal_path = load_latest_json("reports/arena/proposal_*.json")
+    drift_payload, drift_path = load_latest_json("reports/monitoring/drift_latest.json")
+    performance_payload, performance_path = load_latest_json("reports/monitoring/performance_latest.json")
+    retrain_payload, retrain_path = load_latest_json("reports/releases/retrain_decision_latest.json")
+    run_card_path = _latest_file("reports/arena/run_card_*.md")
+    shap_summary_path = _latest_file("reports/model/shap_summary_*.png")
+    shap_waterfall_path = _latest_file("reports/model/shap_waterfall_*.png")
+
+    st.markdown("### Governance and Monitoring Snapshot")
+    g1, g2, g3 = st.columns(3)
+
+    with g1:
+        st.markdown("#### Model Version and Evidence")
+        st.write(
+            f"Model version: `{metadata.get('model_version', 'unknown')}` | "
+            f"Artifact tag: `{metadata.get('artifact_tag', 'unknown')}`"
+        )
+        st.write(
+            f"Dataset version: `{metadata.get('dataset_version', 'N/A')}` | "
+            f"Feature set version: `{metadata.get('feature_set_version', 'N/A')}`"
+        )
+        evidence_rows = [
+            {"artifact": "Model metrics", "path": str(metrics_path) if metrics_path else "missing"},
+            {"artifact": "Model binary", "path": str(model_path) if model_path else "missing"},
+            {"artifact": "Segment scorecard", "path": str(scorecard_path) if scorecard_path else "missing"},
+            {"artifact": "Evaluation predictions", "path": str(eval_path) if eval_path else "missing"},
+            {"artifact": "SHAP summary", "path": str(shap_summary_path) if shap_summary_path else "missing"},
+            {"artifact": "SHAP waterfall", "path": str(shap_waterfall_path) if shap_waterfall_path else "missing"},
+            {"artifact": "Run card", "path": str(run_card_path) if run_card_path else "missing"},
+        ]
+        st.dataframe(pd.DataFrame(evidence_rows), hide_index=True, use_container_width=True)
+
+    with g2:
+        st.markdown("#### Promotion Decision State")
+        if proposal_payload is None:
+            st.info("No arena proposal found.")
+        else:
+            status = str(proposal_payload.get("status", "unknown"))
+            st.metric("Proposal Status", status)
+            st.write(
+                f"Proposal ID: `{proposal_payload.get('proposal_id', 'N/A')}`  \n"
+                f"Created: `{proposal_payload.get('created_at_utc', 'N/A')}`  \n"
+                f"Expires: `{proposal_payload.get('expires_at_utc', 'N/A')}`"
+            )
+            champion = proposal_payload.get("champion", {})
+            st.write(
+                f"Champion run: `{champion.get('run_id', 'N/A')}` | "
+                f"version `{champion.get('model_version', 'N/A')}`"
+            )
+            ranked = proposal_payload.get("candidates_ranked", [])
+            if ranked:
+                top = ranked[0]
+                st.write(
+                    f"Top candidate run: `{top.get('run_id', 'N/A')}` | "
+                    f"gate_pass=`{top.get('gate_pass', 'N/A')}` | score=`{top.get('score', 'N/A')}`"
+                )
+            st.caption(f"Evidence: `{proposal_path}`")
+
+    with g3:
+        st.markdown("#### Drift and Performance")
+        drift_status = (drift_payload or {}).get("status")
+        perf_status = (performance_payload or {}).get("status")
+        retrain_decision = (retrain_payload or {}).get("decision")
+        st.metric("Drift Status", str(drift_status or "N/A"))
+        st.metric("Performance Status", str(perf_status or "N/A"))
+        st.metric("Retrain Decision", str(retrain_decision or "N/A"))
+        overall_perf = ((performance_payload or {}).get("metrics", {}) or {}).get("overall", {})
+        if overall_perf:
+            st.write(
+                f"PPE10: `{_fmt_pct(overall_perf.get('ppe10'))}` | "
+                f"MdAPE: `{_fmt_pct(overall_perf.get('mdape'))}` | "
+                f"Rows: `{overall_perf.get('n', 'N/A')}`"
+            )
+        st.write(
+            f"Evidence paths:  \n"
+            f"- Drift: `{drift_path or 'missing'}`  \n"
+            f"- Performance: `{performance_path or 'missing'}`  \n"
+            f"- Retrain policy: `{retrain_path or 'missing'}`"
+        )
+
+    if metrics is not None:
+        st.caption("Claims above are sourced from local artifacts and reflect their current state.")
+
+
 def _normalize_sales_columns(df: pd.DataFrame) -> pd.DataFrame:
     frame = df.copy()
     frame.columns = [c.strip().lower().replace(" ", "_") for c in frame.columns]
@@ -198,7 +302,12 @@ def load_sales_data(limit: int = 10000) -> Tuple[pd.DataFrame, str, Optional[str
             property_id,
             property_segment,
             price_tier,
+            price_tier_proxy,
             building_age,
+            days_since_2019_start,
+            month_sin,
+            month_cos,
+            rate_regime_bucket,
             is_latest_sale
         FROM sales
         ORDER BY sale_date DESC
@@ -459,6 +568,14 @@ def main() -> None:
         f"Eval predictions: `{eval_path or 'missing'}`"
     )
     render_pipeline_status(sales_df, metrics_path, model_path, scorecard_path)
+    render_governance_monitoring_story(
+        metrics=metrics,
+        metadata=metadata,
+        metrics_path=metrics_path,
+        model_path=model_path,
+        scorecard_path=scorecard_path,
+        eval_path=eval_path,
+    )
 
     st.markdown("### Segment Health")
     if scorecard_df.empty:
@@ -564,6 +681,17 @@ def main() -> None:
         f"Uncertainty note: using MdAPE={mdape_used * 100:.2f}% "
         f"({'segment-specific' if segment_name in per_segment else 'overall baseline'})."
     )
+    confidence_score = max(0.0, min(1.0, 1.0 - mdape_used))
+    st.markdown("#### Valuation Output Contract")
+    contract_rows = [
+        {"field": "predicted_value", "value": _fmt_currency(pred_price)},
+        {"field": "low_value_bound", "value": _fmt_currency(lower)},
+        {"field": "high_value_bound", "value": _fmt_currency(upper)},
+        {"field": "confidence_score", "value": _fmt_pct(confidence_score)},
+        {"field": "model_version", "value": str(metadata.get("model_version", "N/A"))},
+        {"field": "dataset_version", "value": str(metadata.get("dataset_version", "N/A"))},
+    ]
+    st.dataframe(pd.DataFrame(contract_rows), hide_index=True, use_container_width=True)
 
     if not sales_df.empty:
         history = pd.DataFrame()
@@ -593,6 +721,8 @@ def main() -> None:
     )
     st.plotly_chart(fig_contrib, use_container_width=True)
     st.dataframe(top_contrib[["feature", "contribution"]], hide_index=True, use_container_width=True)
+    top_driver_list = top_contrib["feature"].head(5).tolist()
+    st.write(f"Top drivers: `{', '.join(top_driver_list) if top_driver_list else 'N/A'}`")
 
     if base_value is not None:
         st.markdown("#### SHAP Waterfall")

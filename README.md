@@ -115,6 +115,7 @@ If you are reviewing this as a hiring manager or technical lead, these paths sho
 - monitoring outputs: `reports/monitoring/`
 - release readiness reports: `reports/validation/`
 - release policy artifacts: `reports/releases/`
+- stakeholder demo flow + operator docs: `docs/demo/`
 
 ## What I Plan To Improve Next
 

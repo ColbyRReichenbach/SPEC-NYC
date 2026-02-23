@@ -1,0 +1,17 @@
+{
+  "Data": [
+    "python3 -m unittest tests.test_etl tests.test_canonical -q"
+  ],
+  "Model": [
+    "python3 -m unittest tests.test_evaluate tests.test_model_temporal -q"
+  ],
+  "Product": [
+    "python3 -m streamlit run app.py --server.headless true --server.address 127.0.0.1 --server.port 8510"
+  ],
+  "Ops": [
+    "python3 -m unittest tests.test_monitoring -q"
+  ],
+  "Gate E (Release)": [
+    "python3 -m src.validate_release --mode smoke --contract-profile canonical"
+  ]
+}

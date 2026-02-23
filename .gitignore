@@ -107,3 +107,20 @@ chroma_db/
 models/*smoke*
 reports/**/*smoke*
 reports/validation/smoke_inputs/
+
+# ----- Local Generated Experiment Artifacts -----
+# Keep stable baseline artifacts (e.g., model_v1.joblib, metrics_v1.json) tracked.
+# Ignore timestamped/ad-hoc candidate outputs.
+models/model_v1_*.joblib
+models/metrics_v1_*.json
+reports/model/evaluation_predictions_v1_*.csv
+reports/model/segment_scorecard_v1_*.csv
+reports/model/temporal_scorecard_v1_*.csv
+reports/model/shap_summary_v1_*.png
+reports/model/shap_waterfall_v1_*.png
+
+# ----- Local Demo Runtime Snapshots -----
+reports/demo/stakeholder_demo_snapshot_latest.json
+reports/demo/stakeholder_demo_snapshot_latest.md
+reports/validation/demo_smoke_readiness_latest.json
+reports/validation/demo_smoke_readiness_latest.md
