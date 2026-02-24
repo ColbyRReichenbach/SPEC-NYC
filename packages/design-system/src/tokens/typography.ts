@@ -1,7 +1,7 @@
 export const typography = {
   family: {
-    display: '"Space Grotesk", "Sora", sans-serif',
-    body: '"Manrope", "IBM Plex Sans", sans-serif',
+    display: '"Instrument Sans", "Inter", sans-serif',
+    body: '"Inter", sans-serif',
     mono: '"IBM Plex Mono", monospace'
   },
   size: {

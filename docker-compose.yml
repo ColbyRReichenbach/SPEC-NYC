@@ -36,6 +36,21 @@ services:
       - ./data:/app/data
       - ./models:/app/models
     command: streamlit run app.py --server.port=8501 --server.address=0.0.0.0
+
+  # Next.js Frontend (V1 dashboard)
+  web:
+    image: node:20-alpine
+    container_name: spec_nyc_web
+    working_dir: /workspace
+    ports:
+      - "3000:3000"
+    environment:
+      NEXT_TELEMETRY_DISABLED: "1"
+    volumes:
+      - .:/workspace
+      - web_node_modules:/workspace/node_modules
+      - web_app_node_modules:/workspace/web/node_modules
+    command: sh -c "npm install && npm run -w web dev -- --hostname 0.0.0.0 --port 3000"
   # Redis Cache (V4 - optional)
   # redis:
   #   image: redis:7-alpine
@@ -45,6 +60,8 @@ services:
 
 volumes:
   postgres_data:
+  web_node_modules:
+  web_app_node_modules:
 
 
 networks:

@@ -2,18 +2,16 @@ import Link from "next/link";
 
 export default function HomePage() {
   return (
-    <main>
-      <div className="card">
-        <h1>SPEC NYC AVM Dashboard</h1>
-        <p>Use the production dashboard routes below.</p>
-        <ul>
-          <li><Link href="/valuation/single">Single valuation</Link></li>
-          <li><Link href="/valuation/batch">Batch valuation</Link></li>
-          <li><Link href="/governance">Model governance</Link></li>
-          <li><Link href="/monitoring">Monitoring and drift</Link></li>
-          <li><Link href="/copilot">AI copilot</Link></li>
-        </ul>
-      </div>
+    <main className="landing-shell">
+      <section className="card fade-in-up">
+        <h1>Azuli AVM Dashboard</h1>
+        <p className="muted">Canonical, datasource-agnostic valuation workflows for production decisioning.</p>
+        <div className="button-row">
+          <Link href="/valuation/single" className="primary-btn">
+            Open Dashboard
+          </Link>
+        </div>
+      </section>
     </main>
   );
 }

@@ -1,8 +1,10 @@
 export default function CopilotPage() {
   return (
-    <div className="card">
-      <h1>AI Copilot</h1>
-      <p>Scaffolded page for grounded Q and A over valuation, governance, and monitoring evidence.</p>
-    </div>
+    <section className="card fade-in-up">
+      <h1>Copilot Workspace</h1>
+      <p className="muted">
+        Use the contextual side panel from any core page for grounded answers with citations.
+      </p>
+    </section>
   );
 }

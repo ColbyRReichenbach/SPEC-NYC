@@ -1,8 +1,10 @@
 export default function BatchValuationPage() {
   return (
-    <div className="card">
+    <section className="card fade-in-up">
       <h1>Batch Valuation</h1>
-      <p>Scaffolded page for upload, schema validation, job status, and downloads.</p>
-    </div>
+      <p className="muted">
+        Batch workflow remains a v1.1 scope item. Single valuation, governance, and monitoring are fully wired in v1.
+      </p>
+    </section>
   );
 }

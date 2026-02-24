@@ -1,83 +1,84 @@
-# Web App (Monorepo Frontend)
+# Web App (Azuli-Branded, Canonical-Contract Frontend)
 
-This directory contains the production AVM dashboard scaffold (Next.js App Router + BFF route handlers).
+This directory contains the production AVM dashboard built on Next.js App Router + BFF.
 
-## What is included
+## Architecture rule
 
-- Dashboard page routes:
-  - `/valuation/single`
-  - `/valuation/batch`
-  - `/governance`
-  - `/monitoring`
-  - `/copilot`
-  - `/artifacts`
-- API route scaffolds under `/api/v1/*`
-- Typed contract schemas using `zod`
-- Contract tests with `vitest`
+The frontend and BFF must never depend on raw client database schemas.
 
-## Prerequisites
+- UI consumes only canonical `/api/v1` contracts.
+- Unknown datasource mapping stays in backend ingestion/canonicalization.
+- Source metadata is passed via `source_context` on API responses.
 
-- Node.js 20+
-- npm 10+
+## Implemented v1 scope
 
-## Install
+- `Single Valuation` (guided + expert + map-based property explorer)
+- `Governance` (read-only in no-auth demo mode)
+- `Monitoring`
+- Contextual copilot side panel with grounded citations
+- SHAP visuals (local waterfall + global summary)
 
-Run from repository root:
+## Routes
+
+Dashboard pages:
+
+- `/valuation/single`
+- `/governance`
+- `/monitoring`
+- `/artifacts`
+
+API routes:
+
+- `POST /api/v1/valuations/single`
+- `POST /api/v1/explanations/property`
+- `GET /api/v1/explanations/shap/global`
+- `GET /api/v1/properties/search`
+- `GET /api/v1/properties/nearby`
+- `GET /api/v1/properties/{propertyId}`
+- `GET /api/v1/governance/status`
+- `GET /api/v1/governance/proposals/latest`
+- `POST /api/v1/governance/proposals/{proposalId}/approve` (disabled/no-auth)
+- `POST /api/v1/governance/proposals/{proposalId}/reject` (disabled/no-auth)
+- `GET /api/v1/monitoring/overview`
+- `GET /api/v1/monitoring/drift`
+- `GET /api/v1/monitoring/performance`
+- `GET /api/v1/monitoring/retrain-decision/latest`
+- `POST /api/v1/copilot/ask`
+
+## Contracts
+
+All canonical API responses include:
+
+- `request_id`
+- `contract_version` (`v1`)
+- `generated_at`
+- `source_context`
+
+## Run locally
+
+From repository root:
 
 ```bash
 npm install
-```
-
-## Development
-
-From root:
-
-```bash
 npm run -w web dev
 ```
 
-App runs on `http://localhost:3000` by default.
+## Run with Docker Compose
 
-## Quality checks
+From repository root:
 
-From root:
+```bash
+docker compose up web
+```
+
+Frontend is served at `http://localhost:3000`.
+
+## Checks
 
 ```bash
 npm run frontend:lint
 npm run frontend:typecheck
 npm run frontend:test:contracts
-```
-
-Or run all:
-
-```bash
+# or
 npm run frontend:ci
 ```
-
-## API scaffolds
-
-Current route handlers are typed scaffolds and return deterministic placeholder payloads for frontend integration.
-
-Primary paths:
-
-- `POST /api/v1/valuations/single`
-- `POST /api/v1/valuations/batch`
-- `GET /api/v1/valuations/batch/{jobId}`
-- `GET /api/v1/governance/status`
-- `POST /api/v1/governance/proposals/generate`
-- `GET /api/v1/governance/proposals/latest`
-- `POST /api/v1/governance/proposals/{proposalId}/approve`
-- `POST /api/v1/governance/proposals/{proposalId}/reject`
-- `GET /api/v1/monitoring/overview`
-- `GET /api/v1/monitoring/drift`
-- `GET /api/v1/monitoring/performance`
-- `GET /api/v1/monitoring/retrain-decision/latest`
-- `POST /api/v1/explanations/property`
-- `POST /api/v1/copilot/ask`
-
-## Next implementation steps
-
-1. Replace placeholder route responses with real backend client calls.
-2. Hook each dashboard page to its route handlers via typed data hooks.
-3. Wire authentication and role-based access controls.
-4. Add Playwright flows for single valuation, batch valuation, and governance decisioning.

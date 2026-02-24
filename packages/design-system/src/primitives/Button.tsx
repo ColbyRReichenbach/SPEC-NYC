@@ -6,11 +6,12 @@ export function Button(props: ButtonHTMLAttributes<HTMLButtonElement>) {
       {...props}
       style={{
         borderRadius: 12,
-        border: "1px solid #D8E0DB",
-        background: "#0E8A6A",
+        border: "1px solid transparent",
+        background: "linear-gradient(135deg, #00AE88, #283891)",
         color: "#FFFFFF",
         padding: "10px 14px",
-        cursor: "pointer"
+        cursor: "pointer",
+        fontWeight: 600
       }}
     />
   );
