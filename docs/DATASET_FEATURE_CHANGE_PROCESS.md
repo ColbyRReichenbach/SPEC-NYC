@@ -107,3 +107,42 @@ No feature/data change is considered complete until:
 3. arena decision is logged.
 
 This is the minimum bar for production-grade traceability.
+
+---
+
+## 8) Common Failure Modes and Remediation
+
+1. Feature is not inference-available
+- Symptom:
+  - training/inference contract error for undocumented feature columns.
+- Remediation:
+  - add explicit inference-safe derivation path, or remove the feature from training.
+  - keep feature provenance documented (raw input vs derived).
+
+2. Target-derived leakage path detected
+- Symptom:
+  - contract error for `sale_price`, `price_tier`, `predicted_price`, or similar target-derived fields in features/routing.
+- Remediation:
+  - replace with leakage-safe proxy (for example `price_tier_proxy`), derived only from inference-available signals.
+  - add/update leakage tests before rerunning candidate training.
+
+3. Segment/time missingness spikes
+- Symptom:
+  - high `missing_rate` in `feature_missingness_*.csv` for specific segment-period slices.
+- Remediation:
+  - add robust fallback/imputation for affected features.
+  - consider route-level fallback to global model for sparse slices.
+
+4. Segment/time drift alerts
+- Symptom:
+  - `alert` status in `feature_drift_segment_time_*.csv` for core predictive features.
+- Remediation:
+  - tighten backtest windows and evaluate robustness with rolling slices.
+  - prioritize feature refreshes and retraining policy actions for alerted segments.
+
+5. Policy-gate mismatch despite better R2
+- Symptom:
+  - challenger improves R2 but fails PPE10/MdAPE slice gates.
+- Remediation:
+  - optimize directly for policy metrics (PPE10 + weighted segment MdAPE), not global fit alone.
+  - enforce major-segment floor/drop constraints during tuning.

@@ -13,17 +13,82 @@ ROUTE_DELIMITER = "||"
 MISSING_ROUTE_TOKEN = "__missing__"
 TREND_BASE_DATE = pd.Timestamp("2019-01-01")
 
+# Features/keys must be inference-available and non-target-derived.
+FORBIDDEN_TARGET_DERIVED_COLUMNS = {
+    "sale_price",
+    "price_tier",
+    "predicted_price",
+    "prediction_error",
+    "abs_pct_error",
+    "sale_price_true",
+    "sale_price_pred",
+    "target",
+    "y",
+}
+INFERENCE_AVAILABLE_COLUMNS = {
+    "gross_square_feet",
+    "year_built",
+    "building_age",
+    "residential_units",
+    "total_units",
+    "distance_to_center_km",
+    "h3_price_lag",
+    "days_since_2019_start",
+    "month_sin",
+    "month_cos",
+    "borough",
+    "building_class",
+    "property_segment",
+    "neighborhood",
+    "rate_regime_bucket",
+    "price_tier_proxy",
+}
+
 
 def get_model_strategy(artifact: Dict[str, Any]) -> str:
     strategy = str(artifact.get("model_strategy", "global")).strip().lower()
     return strategy or "global"
 
 
+def validate_feature_columns_for_inference(
+    columns: list[str],
+    *,
+    context: str = "feature_columns",
+) -> list[str]:
+    normalized = [str(col).strip() for col in columns]
+    lowered = [col.lower() for col in normalized]
+    forbidden = sorted({col for col in lowered if col in FORBIDDEN_TARGET_DERIVED_COLUMNS})
+    if forbidden:
+        raise ValueError(f"{context} contains target-derived columns that are disallowed: {forbidden}")
+
+    undocumented = sorted({col for col in normalized if col not in INFERENCE_AVAILABLE_COLUMNS})
+    if undocumented:
+        raise ValueError(
+            f"{context} contains columns without inference-availability contract: {undocumented}. "
+            "Add explicit inference-safe handling before training."
+        )
+    return normalized
+
+
+def validate_router_columns_for_inference(
+    columns: list[str],
+    *,
+    context: str = "router_columns",
+) -> list[str]:
+    out = validate_feature_columns_for_inference(columns, context=context)
+    lowered = [c.lower() for c in out]
+    if "price_tier" in lowered:
+        raise ValueError(
+            "Routing on target-derived 'price_tier' is disallowed. Use non-leaky 'price_tier_proxy' instead."
+        )
+    return out
+
+
 def get_feature_columns(artifact: Dict[str, Any]) -> list[str]:
     raw = artifact.get("feature_columns", [])
     if not isinstance(raw, list):
         return []
-    return [str(col) for col in raw]
+    return validate_feature_columns_for_inference([str(col) for col in raw], context="feature_columns")
 
 
 def get_router_column(artifact: Dict[str, Any]) -> str:
@@ -36,12 +101,7 @@ def get_router_columns(artifact: Dict[str, Any]) -> list[str]:
         out = [str(col) for col in raw]
     else:
         out = [get_router_column(artifact)]
-    normalized = [c.strip().lower() for c in out]
-    if "price_tier" in normalized:
-        raise ValueError(
-            "Routing on target-derived 'price_tier' is disallowed. Use non-leaky 'price_tier_proxy' instead."
-        )
-    return out
+    return validate_router_columns_for_inference(out, context="router_columns")
 
 
 def get_segment_pipelines(artifact: Dict[str, Any]) -> Dict[str, Any]:

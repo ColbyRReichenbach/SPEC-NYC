@@ -1,0 +1,326 @@
+{
+  "hypothesis_id": "H-SEASON-001",
+  "run_date_utc": "2026-02-23",
+  "champion": {
+    "run_id": "34e917e198af4e58adb2097b8d9ca229",
+    "model_version": "1",
+    "metrics_path": "models/metrics_v1.json",
+    "predictions_path": "reports/model/evaluation_predictions_v1.csv"
+  },
+  "challenger": {
+    "run_id": "7a7a754a94d5435f9131f6ddd0dcfb32",
+    "model_version": "5",
+    "metrics_path": "models/metrics_v1_hseason001_20260223_t1555.json",
+    "predictions_path": "reports/model/evaluation_predictions_v1_hseason001_20260223_t1555.csv",
+    "feature_set_version": "fs_seasonality_regime_v1",
+    "dataset_version": "ds_hseason001_train_20260223"
+  },
+  "overall": {
+    "champion": {
+      "n": 59092,
+      "ppe10": 0.32537399309551207,
+      "mdape": 0.1636683857733176,
+      "r2": 0.028096760803456355
+    },
+    "challenger": {
+      "n": 59092,
+      "ppe10": 0.21857442631828336,
+      "mdape": 0.2523535784313725,
+      "r2": 0.30633983810493226
+    },
+    "delta": {
+      "mdape": 0.08868519265805491,
+      "ppe10": -0.10679956677722871,
+      "r2": 0.2782430773014759
+    }
+  },
+  "per_segment": [
+    {
+      "segment": "ELEVATOR",
+      "n": 25785,
+      "major_segment": true,
+      "champion_ppe10": 0.22854372697304634,
+      "challenger_ppe10": 0.12190202846837063,
+      "ppe10_delta": -0.10664169850467571,
+      "champion_mdape": 0.22243876582278482,
+      "challenger_mdape": 0.4361526128910901,
+      "mdape_delta": 0.21371384706830526
+    },
+    {
+      "segment": "SINGLE_FAMILY",
+      "n": 25146,
+      "major_segment": true,
+      "champion_ppe10": 0.4585222301757735,
+      "challenger_ppe10": 0.33175600445363446,
+      "ppe10_delta": -0.12676622572213903,
+      "champion_mdape": 0.10882137931034483,
+      "challenger_mdape": 0.1542889785300316,
+      "mdape_delta": 0.045467599219686766
+    },
+    {
+      "segment": "SMALL_MULTI",
+      "n": 3018,
+      "major_segment": true,
+      "champion_ppe10": 0.2147117296222664,
+      "challenger_ppe10": 0.15076209410205435,
+      "ppe10_delta": -0.06394963552021204,
+      "champion_mdape": 0.23805547317753287,
+      "challenger_mdape": 0.3610704002808989,
+      "mdape_delta": 0.123014927103366
+    },
+    {
+      "segment": "WALKUP",
+      "n": 5143,
+      "major_segment": true,
+      "champion_ppe10": 0.2247715341240521,
+      "challenger_ppe10": 0.189578067275909,
+      "ppe10_delta": -0.03519346684814309,
+      "champion_mdape": 0.23134285714285716,
+      "challenger_mdape": 0.27847192234848483,
+      "mdape_delta": 0.04712906520562768
+    }
+  ],
+  "per_price_tier": [
+    {
+      "tier": "core",
+      "n": 14509,
+      "champion_ppe10": 0.44923840374939694,
+      "challenger_ppe10": 0.2573042998897464,
+      "ppe10_delta": -0.19193410385965054,
+      "champion_mdape": 0.1133346195652174,
+      "challenger_mdape": 0.21477344362638318,
+      "mdape_delta": 0.10143882406116578
+    },
+    {
+      "tier": "entry",
+      "n": 13026,
+      "champion_ppe10": 0.22984799631506217,
+      "challenger_ppe10": 0.15471437346437347,
+      "ppe10_delta": -0.0751336228506887,
+      "champion_mdape": 0.2130706698671338,
+      "challenger_mdape": 0.4553103730608566,
+      "mdape_delta": 0.2422397031937228
+    },
+    {
+      "tier": "luxury",
+      "n": 16211,
+      "champion_ppe10": 0.15884276108815001,
+      "challenger_ppe10": 0.18918085368862572,
+      "ppe10_delta": 0.030338092600475708,
+      "champion_mdape": 0.3335226063829787,
+      "challenger_mdape": 0.25935526013805,
+      "mdape_delta": -0.07416734624492871
+    },
+    {
+      "tier": "premium",
+      "n": 15346,
+      "champion_ppe10": 0.46526782223380686,
+      "challenger_ppe10": 0.26720542231491134,
+      "ppe10_delta": -0.19806239991889552,
+      "champion_mdape": 0.10650455525169487,
+      "challenger_mdape": 0.19876041707002026,
+      "mdape_delta": 0.09225586181832539
+    }
+  ],
+  "major_segments": [
+    "ELEVATOR",
+    "SINGLE_FAMILY",
+    "SMALL_MULTI",
+    "WALKUP"
+  ],
+  "temporal_stability_overall": {
+    "champion_quarters": 6,
+    "champion_mdape_std": 0.00462344873153278,
+    "champion_ppe10_std": 0.0065166711822553765,
+    "champion_mdape_range": 0.014983192307692239,
+    "champion_ppe10_range": 0.020847317419597666,
+    "champion_mdape_last_minus_first": 0.00759571052631583,
+    "champion_ppe10_last_minus_first": -0.012126057729975659,
+    "champion_first_period": "2023Q3",
+    "champion_last_period": "2024Q4",
+    "challenger_quarters": 6,
+    "challenger_mdape_std": 0.009858703387893554,
+    "challenger_ppe10_std": 0.007964925103847427,
+    "challenger_mdape_range": 0.03269234733927043,
+    "challenger_ppe10_range": 0.0227497012629945,
+    "challenger_mdape_last_minus_first": 0.008020154650854872,
+    "challenger_ppe10_last_minus_first": -0.0227497012629945,
+    "challenger_first_period": "2023Q3",
+    "challenger_last_period": "2024Q4",
+    "delta_mdape_std": 0.005235254656360774,
+    "delta_ppe10_std": 0.0014482539215920501,
+    "delta_mdape_range": 0.01770915503157819,
+    "delta_ppe10_range": 0.001902383843396832
+  },
+  "temporal_stability_major_segments_champion": [
+    {
+      "segment": "ELEVATOR",
+      "quarters": 6,
+      "mdape_std": 0.005347387806307545,
+      "ppe10_std": 0.008787675602493758,
+      "mdape_range": 0.015312726352079142,
+      "ppe10_range": 0.02643582430575528,
+      "mdape_last_minus_first": 0.004475951968484576,
+      "ppe10_last_minus_first": -0.022550178917498387,
+      "first_period": "2023Q3",
+      "last_period": "2024Q4"
+    },
+    {
+      "segment": "SINGLE_FAMILY",
+      "quarters": 6,
+      "mdape_std": 0.001126001670801099,
+      "ppe10_std": 0.004294162645137754,
+      "mdape_range": 0.003381109099868454,
+      "ppe10_range": 0.011591372087558338,
+      "mdape_last_minus_first": 0.0025437541671100156,
+      "ppe10_last_minus_first": -0.007003698847457496,
+      "first_period": "2023Q3",
+      "last_period": "2024Q4"
+    },
+    {
+      "segment": "SMALL_MULTI",
+      "quarters": 6,
+      "mdape_std": 0.012468507993388696,
+      "ppe10_std": 0.026558240082980522,
+      "mdape_range": 0.032637673913043425,
+      "ppe10_range": 0.07529508501100765,
+      "mdape_last_minus_first": 0.01515588073094079,
+      "ppe10_last_minus_first": -0.04457049658288048,
+      "first_period": "2023Q3",
+      "last_period": "2024Q4"
+    },
+    {
+      "segment": "WALKUP",
+      "quarters": 6,
+      "mdape_std": 0.008846563767066693,
+      "ppe10_std": 0.013432917796739169,
+      "mdape_range": 0.029343931978734167,
+      "ppe10_range": 0.040926491022532235,
+      "mdape_last_minus_first": 0.015782957684408072,
+      "ppe10_last_minus_first": 0.0055725673179741475,
+      "first_period": "2023Q3",
+      "last_period": "2024Q4"
+    }
+  ],
+  "temporal_stability_major_segments_challenger": [
+    {
+      "segment": "ELEVATOR",
+      "quarters": 6,
+      "mdape_std": 0.042804803679550446,
+      "ppe10_std": 0.009770149327182058,
+      "mdape_range": 0.10869711544147509,
+      "ppe10_range": 0.023975964715217415,
+      "mdape_last_minus_first": 0.059150605740085904,
+      "ppe10_last_minus_first": -0.019165648325953674,
+      "first_period": "2023Q3",
+      "last_period": "2024Q4"
+    },
+    {
+      "segment": "SINGLE_FAMILY",
+      "quarters": 6,
+      "mdape_std": 0.005828180211367921,
+      "ppe10_std": 0.01778178188883712,
+      "mdape_range": 0.016418893280583213,
+      "ppe10_range": 0.04941664434076465,
+      "mdape_last_minus_first": 0.012608075649637174,
+      "ppe10_last_minus_first": -0.041521537331837,
+      "first_period": "2023Q3",
+      "last_period": "2024Q4"
+    },
+    {
+      "segment": "SMALL_MULTI",
+      "quarters": 6,
+      "mdape_std": 0.027412019626392413,
+      "ppe10_std": 0.024367311505842204,
+      "mdape_range": 0.08922673057033098,
+      "ppe10_range": 0.07588209670393496,
+      "mdape_last_minus_first": -0.028756280153508784,
+      "ppe10_last_minus_first": 0.008032215462556003,
+      "first_period": "2023Q3",
+      "last_period": "2024Q4"
+    },
+    {
+      "segment": "WALKUP",
+      "quarters": 6,
+      "mdape_std": 0.011055996426333665,
+      "ppe10_std": 0.012829109877417533,
+      "mdape_range": 0.032440296538356395,
+      "ppe10_range": 0.037408820183363445,
+      "mdape_last_minus_first": 0.01084100127830706,
+      "ppe10_last_minus_first": 0.010180324681637015,
+      "first_period": "2023Q3",
+      "last_period": "2024Q4"
+    }
+  ],
+  "temporal_stability_major_segment_delta": [
+    {
+      "segment": "ELEVATOR",
+      "mdape_std_delta": 0.0374574158732429,
+      "ppe10_std_delta": 0.0009824737246883,
+      "mdape_range_delta": 0.09338438908939595,
+      "ppe10_range_delta": -0.0024598595905378634,
+      "mdape_last_minus_first_delta": 0.05467465377160133,
+      "ppe10_last_minus_first_delta": 0.0033845305915447127
+    },
+    {
+      "segment": "SINGLE_FAMILY",
+      "mdape_std_delta": 0.004702178540566822,
+      "ppe10_std_delta": 0.013487619243699366,
+      "mdape_range_delta": 0.01303778418071476,
+      "ppe10_range_delta": 0.03782527225320631,
+      "mdape_last_minus_first_delta": 0.010064321482527158,
+      "ppe10_last_minus_first_delta": -0.034517838484379504
+    },
+    {
+      "segment": "SMALL_MULTI",
+      "mdape_std_delta": 0.014943511633003717,
+      "ppe10_std_delta": -0.002190928577138318,
+      "mdape_range_delta": 0.056589056657287556,
+      "ppe10_range_delta": 0.0005870116929273111,
+      "mdape_last_minus_first_delta": -0.043912160884449575,
+      "ppe10_last_minus_first_delta": 0.052602712045436484
+    },
+    {
+      "segment": "WALKUP",
+      "mdape_std_delta": 0.0022094326592669716,
+      "ppe10_std_delta": -0.0006038079193216358,
+      "mdape_range_delta": 0.003096364559622228,
+      "ppe10_range_delta": -0.0035176708391687905,
+      "mdape_last_minus_first_delta": -0.004941956406101011,
+      "ppe10_last_minus_first_delta": 0.004607757363662868
+    }
+  ],
+  "arena_proposal": {
+    "proposal_path": "reports/arena/proposal_8a33c69e69d9.json",
+    "proposal_status": "no_winner",
+    "comparison_csv": "reports/arena/comparison_20260223T155837Z.csv",
+    "candidate_rank": {
+      "run_id": "7a7a754a94d5435f9131f6ddd0dcfb32",
+      "model_version": "v1",
+      "score": -0.72,
+      "gate_pass": false,
+      "weighted_segment_mdape_improvement": -0.7000811446896945,
+      "overall_ppe10_lift": -0.10679956677722871,
+      "max_major_segment_ppe10_drop": 0.12676622572213903,
+      "min_major_segment_ppe10": 0.12190202846837063,
+      "drift_alert_delta": 0,
+      "fairness_alert_delta": 0
+    }
+  },
+  "recommendation": "rework",
+  "gate_viable": false,
+  "artifacts": {
+    "run_card_champion": "reports/arena/run_card_34e917e198af4e58adb2097b8d9ca229.md",
+    "run_card_challenger": "reports/arena/run_card_7a7a754a94d5435f9131f6ddd0dcfb32.md",
+    "arena_proposal_json": "reports/arena/proposal_8a33c69e69d9.json",
+    "arena_proposal_md": "reports/arena/proposal_8a33c69e69d9.md",
+    "arena_comparison_csv": "reports/arena/comparison_20260223T155837Z.csv",
+    "temporal_scorecard_champion_recomputed": "reports/model/temporal_scorecard_v1_baseline_recomputed_20260223_t1555.csv",
+    "temporal_scorecard_challenger_recomputed": "reports/model/temporal_scorecard_v1_hseason001_20260223_t1555_recomputed.csv",
+    "feature_missingness_challenger": "reports/model/feature_missingness_v1_hseason001_20260223_t1555.csv",
+    "feature_drift_challenger": "reports/model/feature_drift_segment_time_v1_hseason001_20260223_t1555.csv",
+    "segment_scorecard_challenger": "reports/model/segment_scorecard_v1_hseason001_20260223_t1555.csv",
+    "shap_summary_challenger": "reports/model/shap_summary_v1_hseason001_20260223_t1555.png",
+    "shap_waterfall_challenger": "reports/model/shap_waterfall_v1_hseason001_20260223_t1555.png"
+  }
+}

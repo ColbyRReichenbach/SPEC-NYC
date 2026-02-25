@@ -16,6 +16,6 @@
   "signals": {
     "drift_alerts": 3,
     "performance_status": "alert",
-    "model_age_days": 0
+    "model_age_days": 11
   }
 }

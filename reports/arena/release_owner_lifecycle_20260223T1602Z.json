@@ -1,0 +1,90 @@
+{
+  "generated_at_utc": "2026-02-23T16:04:21.375214+00:00",
+  "candidate_run_id": "879ab7838c214d3a907e34a687978264",
+  "candidate_model_version": "6",
+  "proposal_id": "57e6c66f5205",
+  "proposal_status": "no_winner",
+  "recommendation": "reject",
+  "policy_gate_status": [
+    {
+      "gate": "weighted_segment_mdape_improvement",
+      "actual": -0.7000811446896945,
+      "threshold": 0.05,
+      "operator": ">=",
+      "status": "fail"
+    },
+    {
+      "gate": "max_major_segment_ppe10_drop",
+      "actual": 0.12676622572213903,
+      "threshold": 0.02,
+      "operator": "<=",
+      "status": "fail"
+    },
+    {
+      "gate": "major_segment_ppe10_floor",
+      "actual": 0.12190202846837063,
+      "threshold": 0.24,
+      "operator": ">=",
+      "status": "fail"
+    },
+    {
+      "gate": "no_new_drift_alerts",
+      "actual": 0,
+      "threshold": 0,
+      "operator": "<=",
+      "status": "pass"
+    },
+    {
+      "gate": "no_new_fairness_alerts",
+      "actual": 0,
+      "threshold": 0,
+      "operator": "<=",
+      "status": "pass"
+    }
+  ],
+  "production_validation": {
+    "report_json": "reports/validation/v1_readiness_arena_lifecycle_20260223T1602_production.json",
+    "report_md": "reports/validation/v1_readiness_arena_lifecycle_20260223T1602_production.md",
+    "gate_e_all_green": false,
+    "failed_checks": [
+      "arena_governance_production"
+    ]
+  },
+  "artifacts": {
+    "run_card": "reports/arena/run_card_879ab7838c214d3a907e34a687978264.md",
+    "comparison_csv": "reports/arena/comparison_20260223T160234Z.csv",
+    "proposal_json": "reports/arena/proposal_57e6c66f5205.json",
+    "proposal_md": "reports/arena/proposal_57e6c66f5205.md",
+    "validation_json": "reports/validation/v1_readiness_arena_lifecycle_20260223T1602_production.json",
+    "validation_md": "reports/validation/v1_readiness_arena_lifecycle_20260223T1602_production.md",
+    "unit_test_log": "reports/validation/logs/unit_tests.log",
+    "streamlit_log": "reports/validation/logs/streamlit_app_production.log"
+  },
+  "commands": [
+    {
+      "cmd": "python3 -m src.mlops.track_run --metrics-json models/metrics_v1_hseason001_20260223_t1555.json --model-artifact models/model_v1_hseason001_20260223_t1555.joblib --scorecard-csv reports/model/segment_scorecard_v1_hseason001_20260223_t1555.csv --predictions-csv reports/model/evaluation_predictions_v1_hseason001_20260223_t1555.csv --experiment-name spec-nyc-avm --run-name release-owner-hseason001-20260223T1603Z --dataset-version ds_hseason001_train_20260223 --git-sha <git_sha> --tracking-uri sqlite:///mlflow.db --hypothesis-id H-SEASON-001 --change-type feature --change-summary \"Release lifecycle registration for H-SEASON-001 temporal challenger\" --owner colbyreichenbach --feature-set-version fs_seasonality_regime_v1 --register-model --registered-model-name spec-nyc-avm --alias candidate --run-kind train --arena-dir reports/arena",
+      "status": "pass",
+      "result": "run_id=879ab7838c214d3a907e34a687978264, model_version=6"
+    },
+    {
+      "cmd": "./scripts/ds_workflow.sh arena-propose",
+      "status": "pass",
+      "result": "proposal_id=57e6c66f5205, status=no_winner"
+    },
+    {
+      "cmd": "python3 -m src.validate_release --mode production --mlflow-tracking-uri sqlite:///mlflow.db --arena-policy-path config/arena_policy.yaml --arena-dir reports/arena --output-md reports/validation/v1_readiness_arena_lifecycle_20260223T1602_production.md --output-json reports/validation/v1_readiness_arena_lifecycle_20260223T1602_production.json",
+      "status": "fail",
+      "result": "gate_e_all_green=false; failed_check=arena_governance_production"
+    },
+    {
+      "cmd": "./scripts/ds_workflow.sh arena-reject --proposal-id 57e6c66f5205 --reason \"Reject: failed weighted MdAPE uplift, major-segment PPE10 drop/floor gates\" --rejected-by colbyreichenbach",
+      "status": "fail",
+      "result": "workflow wrapper bug: passes unsupported args to arena reject"
+    },
+    {
+      "cmd": "python3 -m src.mlops.arena reject --proposal-id 57e6c66f5205 --arena-dir reports/arena --reason \"Reject: failed weighted MdAPE uplift, major-segment PPE10 drop/floor gates\" --rejected-by colbyreichenbach",
+      "status": "fail",
+      "result": "proposal status=no_winner (not rejectable; only pending can reject)"
+    }
+  ]
+}

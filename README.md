@@ -1,53 +1,64 @@
+<div align="center">
+
 # S.P.E.C. NYC
 
-An applied data science and MLOps project for NYC residential AVM development.
+**Production-oriented AVM pipeline for NYC residential valuation**  
+Hypothesis-driven Data Science + MLOps with contracts, governance, and release gates.
 
-I built this repository to show how I work as a production-minded data scientist: define hypotheses, build reliable data pipelines, train and evaluate models with segment-level accountability, and make controlled champion/challenger decisions with auditable evidence.
+[![Python](https://img.shields.io/badge/Python-3.10+-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![XGBoost](https://img.shields.io/badge/XGBoost-Modeling-FF6F00)](https://xgboost.ai/)
+[![MLflow](https://img.shields.io/badge/MLflow-Tracking-0194E2?logo=mlflow&logoColor=white)](https://mlflow.org/)
+[![Next.js](https://img.shields.io/badge/Next.js-Frontend-000000?logo=nextdotjs&logoColor=white)](https://nextjs.org/)
+[![Postgres](https://img.shields.io/badge/Postgres-Data%20Store-336791?logo=postgresql&logoColor=white)](https://www.postgresql.org/)
+[![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white)](https://www.docker.com/)
+[![pytest](https://img.shields.io/badge/pytest-Tested-0A9EDC?logo=pytest&logoColor=white)](https://docs.pytest.org/)
+[![OpenAI](https://img.shields.io/badge/OpenAI-GPT--4o--mini-412991?logo=openai&logoColor=white)](https://openai.com/)
 
-## Why I Built It
+</div>
 
-Most DS portfolios stop at notebooks and one model metric. This project is intentionally different.
+## Overview
 
-I wanted to demonstrate a full lifecycle that reflects how teams operate in real environments:
-- data ingestion and ETL with data contracts,
-- reproducible model training and evaluation,
-- explainability artifacts,
-- model registry and promotion controls,
-- monitoring, retrain policy, and release validation.
+S.P.E.C. NYC is an applied AVM program designed to mirror real production workflows rather than notebook-only experimentation.
+
+The repository focuses on:
+- contract-driven ingestion and ETL,
+- reproducible model training/evaluation,
+- explainability and segment accountability,
+- champion/challenger governance,
+- release readiness validation with auditable artifacts.
 
 ## What This Repository Demonstrates
 
-1. Reliable data foundation:
+1. Data foundation and contract controls
 - NYC Open Data connector with retries, pagination, caching, and annualized pulls (`src/connectors.py`).
 - ETL with residential filtering, property ID normalization, duplicate handling, segmentation, imputation, and Postgres load (`src/etl.py`).
-- explicit data-contract checks for schema, freshness, null thresholds, and domain constraints (`src/validation/data_contracts.py`).
+- Canonical and data-contract checks for schema, freshness, null thresholds, and domain constraints (`src/validation/data_contracts.py`, `src/canonical/`).
 
-2. Production-style modeling:
-- baseline XGBoost training pipeline with time-based split and optional Optuna tuning (`src/model.py`).
-- global and segmented routing strategies with fallback behavior.
-- leakage controls around price-tier usage (routing safeguards and proxy requirement for tier-based routing).
+2. Production-style modeling
+- Baseline XGBoost training with time-aware split and optional Optuna tuning (`src/model.py`).
+- Routing modes (`global`, `segment_only`, staged `segment_plus_tier` with non-leaky proxy requirements).
+- Leakage controls and inference-availability checks in train-time workflows.
 
-3. Evaluation and explainability:
-- overall and slice metrics (PPE10, MdAPE, R2) (`src/evaluate.py`).
-- segment and tier scorecards.
-- SHAP summary and waterfall artifacts (`src/explain.py`).
+3. Evaluation and explainability
+- Overall and slice metrics (PPE10, MdAPE, R2) (`src/evaluate.py`).
+- Segment/tier scorecards and temporal diagnostics.
+- SHAP summary and local waterfall artifacts (`src/explain.py`).
 
-4. MLOps lifecycle controls:
-- MLflow run tracking with structured change metadata (`src/mlops/track_run.py`).
-- registry alias lifecycle (`champion`, `challenger`, `candidate`).
-- arena-based promotion proposals with policy gates and human approval/rejection (`src/mlops/arena.py`, `config/arena_policy.yaml`).
+4. MLOps governance lifecycle
+- MLflow run tracking with structured metadata (`src/mlops/track_run.py`).
+- Model alias lifecycle (`champion`, `challenger`, `candidate`).
+- Arena proposals with policy gates and approve/reject workflows (`src/mlops/arena.py`, `config/arena_policy.yaml`).
 
-5. Operational validation:
-- drift and performance monitors (`src/monitoring/`).
-- retrain policy outputs (`src/retrain_policy.py`).
-- release readiness validation with evidence-aware checks (`src/validate_release.py`).
+5. Operational validation
+- Drift and performance monitoring (`src/monitoring/`).
+- Retrain policy decisions (`src/retrain_policy.py`).
+- Release validator for smoke/production-readiness checks (`src/validate_release.py`).
 
-6. Stakeholder-facing product layer:
-- Streamlit app that reads model/evaluation artifacts and supports valuation workflows (`app.py`).
+6. Product-facing layer
+- Next.js dashboard with valuation, governance, monitoring, and copilot flows (`web/`).
+- Canonical-contract boundary so frontend/BFF never depends on raw client schemas.
 
-## Current Status (As Of February 12, 2026)
-
-The core v1 DS/MLOps workflow is implemented and operational for local/offline experimentation.
+## Current Status (February 12, 2026)
 
 | Area | Status | Primary Evidence |
 |---|---|---|
@@ -60,103 +71,57 @@ The core v1 DS/MLOps workflow is implemented and operational for local/offline e
 | DS workflow runbooks | Implemented | `docs/DS_ROLE_WORKFLOW.md`, `docs/MLOPS_ARENA_WORKFLOW.md` |
 | Next model improvements | Active backlog | `docs/hypotheses/HYPOTHESIS_BACKLOG.md`, `docs/hypotheses/FEATURE_BACKLOG.md` |
 
-## How I Treat This As A Real DS Workflow
+## Reproducibility and Governance
 
-I treat model work as hypothesis-driven, not ad-hoc retraining.
+Every meaningful experiment should track:
+- `hypothesis_id`
+- `change_type` and rationale
+- `dataset_version`
+- `feature_set_version`
+- owner
+- measurable pass/fail gates
+- promotion decision + rollback path
 
-For every meaningful experiment, I track:
-- hypothesis ID,
-- change type and rationale,
-- dataset version,
-- feature set version,
-- owner,
-- measurable pass/fail gates,
-- promotion decision and rollback path.
-
-Key process docs:
-- DS operating model: `docs/DS_ROLE_WORKFLOW.md`
-- Arena lifecycle: `docs/MLOPS_ARENA_WORKFLOW.md`
-- Hypothesis template: `docs/hypotheses/HYPOTHESIS_TEMPLATE.md`
-- Backlog and branching: `docs/hypotheses/HYPOTHESIS_BACKLOG.md`
-- Dataset and feature change control: `docs/DATASET_FEATURE_CHANGE_PROCESS.md`
-
-## Data And Feature Governance Principles
-
-This project uses two required version labels for reproducibility:
-- `dataset_version`: the exact data snapshot used for training.
-- `feature_set_version`: the exact feature logic/version used by the model.
-
-I separate exploratory feature work from promoted feature work:
-- exploratory features can start in training code,
-- durable features should be promoted into ETL once validated.
-
-This keeps model lineage clear and makes artifact comparisons meaningful.
-
-## Modeling Strategy
-
-Current strategy support:
-- global model,
-- segmented router model (`segment_only`),
-- staged support for `segment_plus_tier` with non-leaky tier proxy requirements.
-
-Why XGBoost for baseline:
-- strong performance on structured/tabular data,
-- robust with mixed numeric/categorical pipelines,
-- efficient iteration for hypothesis testing,
-- SHAP compatibility for feature attribution.
-
-## Artifact-First Project Layout
-
-If you are reviewing this as a hiring manager or technical lead, these paths show the workflow quality quickly:
-
-- data and ETL evidence: `reports/data/`
-- model metrics and scorecards: `models/`, `reports/model/`
-- arena decisions and change notes: `reports/arena/`
-- monitoring outputs: `reports/monitoring/`
-- release readiness reports: `reports/validation/`
-- release policy artifacts: `reports/releases/`
-- stakeholder demo flow + operator docs: `docs/demo/`
-
-## What I Plan To Improve Next
-
-Current priority stream is model strengthening and feature expansion, including:
-- safer tier proxy strategy for segmented routing,
-- NYC-specific feature engineering (transit, liquidity, temporal regime signals),
-- continued challenger evaluation through arena gates before promotion.
-
-Tracked in:
-- `docs/hypotheses/FEATURE_BACKLOG.md`
+Core process docs:
+- `docs/DS_ROLE_WORKFLOW.md`
+- `docs/MLOPS_ARENA_WORKFLOW.md`
+- `docs/hypotheses/HYPOTHESIS_TEMPLATE.md`
 - `docs/hypotheses/HYPOTHESIS_BACKLOG.md`
+- `docs/DATASET_FEATURE_CHANGE_PROCESS.md`
 
+## Artifact-First Layout
 
-## Codex Agentic Extension (Azuli.ai Internship Readiness)
+Review these paths first for signal:
+- `reports/data/` data and ETL evidence
+- `models/`, `reports/model/` metrics and scorecards
+- `reports/arena/` proposal/comparison/run-card evidence
+- `reports/monitoring/` drift/performance snapshots
+- `reports/validation/` release readiness reports
+- `reports/releases/` release-policy outputs
+- `docs/demo/` stakeholder demo/operator guidance
 
-To support low-touch, agentic project delivery in Codex for unknown incoming data schemas, see:
+## Codex Agentic Extension
+
+For autonomous, low-touch execution workflows:
 - `docs/CODEX_AUTONOMY_SETUP.md`
 - `docs/AVM_BUSINESS_LOGIC.md`
+- `.codex/workflows/`
 
-These documents define:
-- autonomous role handoffs and loop controls,
-- schema-adaptive ingestion strategy,
-- AVM domain/business logic for robust modeling decisions,
-- branding-oriented frontend delivery guidance for Azuli-style demos.
-
-Implemented scaffold now includes:
-- Codex control plane and role/workflow/checklist prompts (`.codex/`).
-- Pluggable data-source registry and adapters (`src/datasources/`).
-- Canonical AVM schema + canonicalization + portable contracts (`src/canonical/`).
-- ETL/validator CLI options for `--data-source`, `--mapping-yaml`, and `--contract-profile`.
-- Autopilot loop runner for low-HITL validation/repair cycles (`scripts/autonomy_loop.sh`, `.codex/workflows/60_autopilot_loop.md`).
+Implemented extension surface includes:
+- codex role/workflow/checklist control plane (`.codex/`),
+- datasource adapters and mappings (`src/datasources/`),
+- canonical schema + portable contracts (`src/canonical/`),
+- ETL/validator contract-profile flags,
+- autopilot loop orchestration (`scripts/autonomy_loop.sh`).
 
 ## Project Positioning
 
-This repo is the NYC production-data progression of my earlier S.P.E.C. valuation work. The emphasis here is less on demo UI and more on end-to-end DS execution quality, model governance, and reproducible MLOps behavior.
+This repository is the NYC production-data progression of earlier S.P.E.C. valuation work, with emphasis on DS execution quality, governance rigor, and reproducible MLOps behavior.
 
 ## Author
 
-Colby Reichenbach
-
-GitHub: [ColbyRReichenbach](https://github.com/ColbyRReichenbach)
+Colby Reichenbach  
+GitHub: [ColbyRReichenbach](https://github.com/ColbyRReichenbach)  
 LinkedIn: [colbyreichenbach](https://linkedin.com/in/colbyreichenbach)
 
 ## License

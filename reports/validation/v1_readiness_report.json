@@ -1,133 +1,158 @@
 {
-  "started_at_utc": "2026-02-11T01:37:45.690476",
-  "finished_at_utc": "2026-02-11T01:39:32.682979",
-  "duration_sec": 106.99,
+  "validation_mode": "smoke",
+  "started_at_utc": "2026-02-24T00:22:41.224516",
+  "finished_at_utc": "2026-02-24T00:23:38.984218",
+  "duration_sec": 57.76,
   "checks": [
     {
       "name": "unit_tests",
       "status": "pass",
       "detail": "exit=0; OK",
       "command": "python3 -m unittest tests.test_etl tests.test_evaluate tests.test_ai_security tests.test_monitoring -v",
-      "duration_sec": 6.440330982208252,
+      "duration_sec": 3.5394420623779297,
       "log_path": "reports/validation/logs/unit_tests.log",
-      "artifacts": null
+      "artifacts": null,
+      "evidence_type": "smoke"
     },
     {
       "name": "docker_compose_config",
       "status": "pass",
-      "detail": "exit=0; time=\"2026-02-10T20:37:57-05:00\" level=warning msg=\"/Users/colbyreichenbach/Desktop/SPEC-NYC/docker-compose.yml: the attribute `version` is obsolete, it will be ignored, please remove it to avoid potential confusion\"",
+      "detail": "exit=0; time=\"2026-02-23T19:22:46-05:00\" level=warning msg=\"The \\\"OPENAI_API_KEY\\\" variable is not set. Defaulting to a blank string.\"",
       "command": "docker compose config -q",
-      "duration_sec": 0.6545369625091553,
+      "duration_sec": 0.4766199588775635,
       "log_path": "reports/validation/logs/docker_compose_config.log",
-      "artifacts": null
+      "artifacts": null,
+      "evidence_type": "smoke"
     },
     {
       "name": "docker_compose_up_db",
       "status": "pass",
-      "detail": "exit=0;  Container spec_nyc_db  Running",
+      "detail": "exit=0;  Container spec_nyc_db  Started",
       "command": "docker compose up -d db",
-      "duration_sec": 0.5110781192779541,
+      "duration_sec": 0.532829999923706,
       "log_path": "reports/validation/logs/docker_compose_up_db.log",
-      "artifacts": null
+      "artifacts": null,
+      "evidence_type": "smoke"
     },
     {
       "name": "db_connectivity",
       "status": "pass",
       "detail": "exit=0; db_ok",
       "command": "python3 -c \"from sqlalchemy import create_engine,text; import os; e=create_engine(os.environ['DATABASE_URL']); conn=e.connect(); conn.execute(text('SELECT 1')); conn.close(); print('db_ok')\"",
-      "duration_sec": 0.9645509719848633,
+      "duration_sec": 0.5386619567871094,
       "log_path": "reports/validation/logs/db_connectivity.log",
-      "artifacts": null
+      "artifacts": null,
+      "evidence_type": "smoke"
     },
     {
       "name": "db_schema_create",
       "status": "pass",
       "detail": "exit=0;   Base = declarative_base()",
       "command": "python3 -m src.database create",
-      "duration_sec": 2.012407064437866,
+      "duration_sec": 0.6362729072570801,
       "log_path": "reports/validation/logs/db_schema_create.log",
-      "artifacts": null
+      "artifacts": null,
+      "evidence_type": "smoke"
+    },
+    {
+      "name": "canonicalization_smoke",
+      "status": "pass",
+      "detail": "canonical contracts passed",
+      "command": null,
+      "duration_sec": 0.0,
+      "log_path": null,
+      "artifacts": null,
+      "evidence_type": "smoke"
     },
     {
       "name": "etl_smoke",
       "status": "pass",
-      "detail": "exit=0; 2026-02-10 20:38:05,684 - INFO - Wrote ETL CSV summary: reports/data/etl_run_20260211.csv",
-      "command": "python3 -m src.etl --input reports/validation/smoke_inputs/etl_raw_smoke.csv --limit 220 --dry-run --write-report",
-      "duration_sec": 2.356297254562378,
+      "detail": "exit=0; 2026-02-23 19:22:52,963 - INFO - Wrote ETL CSV summary: reports/data/etl_run_20260224_w6_smoke.csv",
+      "command": "python3 -m src.etl --input reports/validation/smoke_inputs/etl_raw_smoke.csv --limit 220 --dry-run --write-report --report-tag w6_smoke --data-source csv --contract-profile canonical --mapping-yaml src/datasources/mappings/spec_nyc_v1.yaml",
+      "duration_sec": 1.5435540676116943,
       "log_path": "reports/validation/logs/etl_smoke.log",
-      "artifacts": null
+      "artifacts": null,
+      "evidence_type": "smoke"
     },
     {
       "name": "model_smoke",
       "status": "pass",
-      "detail": "exit=0; 2026-02-10 20:38:34,852 - INFO - Generated SHAP artifacts: {'summary_plot_path': 'reports/model/shap_summary_v1_smoke.png', 'waterfall_plot_path': 'reports/model/shap_waterfall_v1_smoke.png', 'sample_size': 120, 'explainer_type': 'xgboost_pred_contribs'}",
+      "detail": "exit=0; 2026-02-23 19:23:03,468 - INFO - Generated SHAP artifacts: {'summary_plot_path': 'reports/model/shap_summary_v1_smoke.png', 'waterfall_plot_path': 'reports/model/shap_waterfall_v1_smoke.png', 'sample_size': 120, 'explainer_type': 'xgboost_pred_contribs', 'explain_scope': 'global', 'model_strategy': 'global'}",
       "command": "python3 -m src.model --input-csv reports/validation/smoke_inputs/train_smoke.csv --model-version v1_smoke --optuna-trials 1 --shap-sample-size 120 --no-mlflow",
-      "duration_sec": 29.07099199295044,
+      "duration_sec": 10.429946899414062,
       "log_path": "reports/validation/logs/model_smoke.log",
-      "artifacts": null
+      "artifacts": null,
+      "evidence_type": "smoke"
     },
     {
       "name": "evaluate_smoke",
       "status": "pass",
-      "detail": "exit=0; Overall => n=160, PPE10=0.963, MdAPE=0.028, R2=0.985",
+      "detail": "exit=0; Overall => n=160, PPE10=0.519, MdAPE=0.095, R2=0.793",
       "command": "python3 -m src.evaluate --predictions-csv reports/model/evaluation_predictions_v1_smoke.csv --output-json models/metrics_v1_smoke_eval.json --segment-scorecard-csv reports/model/segment_scorecard_v1_smoke_eval.csv",
-      "duration_sec": 4.595672130584717,
+      "duration_sec": 2.7948389053344727,
       "log_path": "reports/validation/logs/evaluate_smoke.log",
-      "artifacts": null
+      "artifacts": null,
+      "evidence_type": "smoke"
     },
     {
       "name": "explain_smoke",
       "status": "pass",
-      "detail": "exit=0; 2026-02-10 20:38:50,935 - INFO - Saved SHAP waterfall plot: reports/model/shap_waterfall_v1_smoke.png",
+      "detail": "exit=0; 2026-02-23 19:23:13,591 - INFO - Saved SHAP waterfall plot: reports/model/shap_waterfall_v1_smoke.png",
       "command": "python3 -m src.explain --model-path models/model_v1_smoke.joblib --evaluation-csv reports/model/evaluation_predictions_v1_smoke.csv --summary-plot-path reports/model/shap_summary_v1_smoke.png --waterfall-plot-path reports/model/shap_waterfall_v1_smoke.png --sample-size 120",
-      "duration_sec": 9.6698899269104,
+      "duration_sec": 5.810621976852417,
       "log_path": "reports/validation/logs/explain_smoke.log",
-      "artifacts": null
+      "artifacts": null,
+      "evidence_type": "smoke"
     },
     {
       "name": "mlflow_track_smoke",
       "status": "pass",
-      "detail": "exit=0; 2026/02/10 20:38:56 INFO alembic.runtime.migration: Will assume non-transactional DDL.",
+      "detail": "exit=0; 2026/02/23 19:23:17 INFO alembic.runtime.migration: Will assume non-transactional DDL.",
       "command": "python3 -m src.mlops.track_run --metrics-json models/metrics_v1_smoke.json --model-artifact models/model_v1_smoke.joblib --scorecard-csv reports/model/segment_scorecard_v1_smoke.csv --predictions-csv reports/model/evaluation_predictions_v1_smoke.csv --run-name w6-validate-smoke --dataset-version w6_smoke",
-      "duration_sec": 6.51053786277771,
+      "duration_sec": 4.428743839263916,
       "log_path": "reports/validation/logs/mlflow_track_smoke.log",
-      "artifacts": null
+      "artifacts": null,
+      "evidence_type": "smoke"
     },
     {
       "name": "drift_monitor_smoke",
       "status": "pass",
       "detail": "exit=0; }",
       "command": "python3 -m src.monitoring.drift --reference-csv reports/monitoring/reference_slice_v1.csv --current-csv reports/monitoring/current_slice_v1.csv --output-csv reports/monitoring/drift_w6_smoke.csv --output-json reports/monitoring/drift_w6_smoke.json --output-md reports/monitoring/drift_w6_smoke.md",
-      "duration_sec": 4.4014270305633545,
+      "duration_sec": 0.8261220455169678,
       "log_path": "reports/validation/logs/drift_monitor_smoke.log",
-      "artifacts": null
+      "artifacts": null,
+      "evidence_type": "smoke"
     },
     {
       "name": "performance_monitor_smoke",
       "status": "pass",
       "detail": "exit=0; }",
       "command": "python3 -m src.monitoring.performance --predictions-csv reports/model/evaluation_predictions_v1_smoke.csv --output-json reports/monitoring/performance_w6_smoke.json --output-md reports/monitoring/performance_w6_smoke.md",
-      "duration_sec": 4.031723976135254,
+      "duration_sec": 1.8760337829589844,
       "log_path": "reports/validation/logs/performance_monitor_smoke.log",
-      "artifacts": null
+      "artifacts": null,
+      "evidence_type": "smoke"
     },
     {
       "name": "retrain_policy_smoke",
       "status": "pass",
       "detail": "exit=0; }",
       "command": "python3 -m src.retrain_policy --metrics-json models/metrics_v1_smoke.json --performance-json reports/monitoring/performance_w6_smoke.json --drift-csv reports/monitoring/drift_w6_smoke.csv --output-json reports/releases/retrain_decision_w6_smoke.json --output-md reports/releases/retrain_decision_w6_smoke.md",
-      "duration_sec": 2.1904959678649902,
+      "duration_sec": 0.8394100666046143,
       "log_path": "reports/validation/logs/retrain_policy_smoke.log",
-      "artifacts": null
+      "artifacts": null,
+      "evidence_type": "smoke"
     },
     {
       "name": "streamlit_app_smoke",
       "status": "pass",
       "detail": "app process stayed healthy for startup window",
       "command": "python3 -m streamlit run app.py --server.headless true --server.address 127.0.0.1 --server.port 8504",
-      "duration_sec": 12.194754123687744,
+      "duration_sec": 12.125066995620728,
       "log_path": "reports/validation/logs/streamlit_app_smoke.log",
-      "artifacts": null
+      "artifacts": null,
+      "evidence_type": "smoke"
     },
     {
       "name": "artifact_inventory",
@@ -138,7 +163,27 @@
       "log_path": null,
       "artifacts": [
         "reports/data/etl_run_20260211.md",
+        "reports/data/etl_run_20260211_prod.md",
+        "reports/data/etl_run_20260211_w6_smoke.md",
+        "reports/data/etl_run_20260223_hseason001_dryrun_20260223.md",
+        "reports/data/etl_run_20260223_hseg001_20260223.md",
+        "reports/data/etl_run_20260223_hsegtier001_20260223.md",
+        "reports/data/etl_run_20260223_hsegtier001_dryrun_20260223.md",
+        "reports/data/etl_run_20260223_onboarding_try1.md",
+        "reports/data/etl_run_20260223_onboarding_try2.md",
+        "reports/data/etl_run_20260223_w6_smoke.md",
+        "reports/data/etl_run_20260224_w6_smoke.md",
         "reports/data/etl_run_20260211.csv",
+        "reports/data/etl_run_20260211_prod.csv",
+        "reports/data/etl_run_20260211_w6_smoke.csv",
+        "reports/data/etl_run_20260223_hseason001_dryrun_20260223.csv",
+        "reports/data/etl_run_20260223_hseg001_20260223.csv",
+        "reports/data/etl_run_20260223_hsegtier001_20260223.csv",
+        "reports/data/etl_run_20260223_hsegtier001_dryrun_20260223.csv",
+        "reports/data/etl_run_20260223_onboarding_try1.csv",
+        "reports/data/etl_run_20260223_onboarding_try2.csv",
+        "reports/data/etl_run_20260223_w6_smoke.csv",
+        "reports/data/etl_run_20260224_w6_smoke.csv",
         "models/model_v1.joblib",
         "models/metrics_v1.json",
         "reports/model/segment_scorecard_v1.csv",
@@ -148,25 +193,28 @@
         "reports/monitoring/performance_latest.json",
         "reports/releases/retrain_decision_latest.json",
         "app.py"
-      ]
+      ],
+      "evidence_type": "smoke"
     },
     {
       "name": "docker_compose_stop_db",
       "status": "pass",
       "detail": "exit=0;  Container spec_nyc_db  Stopped",
       "command": "docker compose stop db",
-      "duration_sec": 5.047257661819458,
+      "duration_sec": 0.7528378963470459,
       "log_path": "reports/validation/logs/docker_compose_stop_db.log",
-      "artifacts": null
+      "artifacts": null,
+      "evidence_type": "smoke"
     },
     {
       "name": "release_tag",
       "status": "pass",
-      "detail": "created git tag v1.0",
-      "command": "git tag -a v1.0 -m \"S.P.E.C. NYC v1.0\"",
+      "detail": "tagging skipped (--tag-release not set)",
+      "command": null,
       "duration_sec": 0.0,
-      "log_path": "reports/validation/logs/release_tag_create.log",
-      "artifacts": null
+      "log_path": null,
+      "artifacts": null,
+      "evidence_type": "release"
     }
   ],
   "gates": {
@@ -178,6 +226,7 @@
         "docker_compose_up_db",
         "db_connectivity",
         "db_schema_create",
+        "canonicalization_smoke",
         "etl_smoke"
       ],
       "failed_checks": [],
