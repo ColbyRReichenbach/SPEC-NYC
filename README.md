@@ -14,6 +14,12 @@ Hypothesis-driven Data Science + MLOps with contracts, governance, and release g
 [![pytest](https://img.shields.io/badge/pytest-Tested-0A9EDC?logo=pytest&logoColor=white)](https://docs.pytest.org/)
 [![OpenAI](https://img.shields.io/badge/OpenAI-GPT--4o--mini-412991?logo=openai&logoColor=white)](https://openai.com/)
 
+## Built by **Colby Reichenbach**
+
+[![LinkedIn](https://img.shields.io/badge/LinkedIn-Connect-0077B5?style=flat-square&logo=linkedin&logoColor=white)](https://www.linkedin.com/in/colby-reichenbach/)
+[![Portfolio](https://img.shields.io/badge/Portfolio%20-%20Check%20Out%20My%20Work?style=flat-square&label=Check%20Out%20My%20Work&color=4B9CD3)](https://colbyrreichenbach.github.io/)
+[![GitHub](https://img.shields.io/badge/GitHub-Follow-181717?style=flat-square&logo=github&logoColor=white)](https://github.com/ColbyRReichenbach)
+
 </div>
 
 ## Overview
@@ -117,14 +123,6 @@ Implemented extension surface includes:
 ## Project Positioning
 
 This repository is the NYC production-data progression of earlier S.P.E.C. valuation work, with emphasis on DS execution quality, governance rigor, and reproducible MLOps behavior.
-
-## About
-
-Built by **Colby Reichenbach**
-
-[![LinkedIn](https://img.shields.io/badge/LinkedIn-Connect-0077B5?style=flat-square&logo=linkedin&logoColor=white)](https://www.linkedin.com/in/colby-reichenbach/)
-[![Portfolio](https://img.shields.io/badge/Portfolio-Visit-000000?style=flat-square&logo=githubpages&logoColor=white)](https://colbyrreichenbach.github.io/)
-[![GitHub](https://img.shields.io/badge/GitHub-Follow-181717?style=flat-square&logo=github&logoColor=white)](https://github.com/ColbyRReichenbach)
 
 ## License
 
