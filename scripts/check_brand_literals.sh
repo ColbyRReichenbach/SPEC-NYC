@@ -9,7 +9,11 @@ allowed_paths=(
   "web/app/globals.css"
 )
 
-matches="$(rg --no-heading --line-number --color never -S '(Azuli|azuli)' web || true)"
+if command -v rg >/dev/null 2>&1; then
+  matches="$(rg --no-heading --line-number --color never -S '(Azuli|azuli)' web || true)"
+else
+  matches="$(grep -RInE '(Azuli|azuli)' web || true)"
+fi
 
 if [[ -z "${matches}" ]]; then
   echo "Brand literal guard passed: no Azuli literals found."
