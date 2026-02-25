@@ -118,11 +118,13 @@ Implemented extension surface includes:
 
 This repository is the NYC production-data progression of earlier S.P.E.C. valuation work, with emphasis on DS execution quality, governance rigor, and reproducible MLOps behavior.
 
-## Author
+## About
 
-Colby Reichenbach  
-GitHub: [ColbyRReichenbach](https://github.com/ColbyRReichenbach)  
-LinkedIn: [colbyreichenbach](https://linkedin.com/in/colbyreichenbach)
+Built by **Colby Reichenbach**
+
+[![LinkedIn](https://img.shields.io/badge/LinkedIn-Connect-0077B5?style=flat-square&logo=linkedin&logoColor=white)](https://www.linkedin.com/in/colby-reichenbach/)
+[![Portfolio](https://img.shields.io/badge/Portfolio-Visit-000000?style=flat-square&logo=githubpages&logoColor=white)](https://colbyrreichenbach.github.io/)
+[![GitHub](https://img.shields.io/badge/GitHub-Follow-181717?style=flat-square&logo=github&logoColor=white)](https://github.com/ColbyRReichenbach)
 
 ## License
 
