@@ -8,12 +8,12 @@
   --text-secondary: #5d6770;
   --text-inverse: #f1f3f5;
 
-  --brand-slate: #4c6971;
-  --brand-teal: #08b38f;
-  --brand-teal-strong: #01927b;
-  --brand-blue: #283891;
-  --brand-blue-bright: #01ade9;
-  --brand-green: #00a651;
+  --brand-slate: #3f4c5c;
+  --brand-teal: #2f5c87;
+  --brand-teal-strong: #274c72;
+  --brand-blue: #30445e;
+  --brand-blue-bright: #1f6db4;
+  --brand-green: #2f9a66;
   --brand-ink: #0a0a0a;
 
   --border-subtle: #d9e0e3;
@@ -32,6 +32,15 @@
 
   --motion-fast: 140ms ease-out;
   --motion-standard: 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+body[data-brand="azuli"] {
+  --brand-slate: #4c6971;
+  --brand-teal: #08b38f;
+  --brand-teal-strong: #01927b;
+  --brand-blue: #283891;
+  --brand-blue-bright: #01ade9;
+  --brand-green: #00a651;
 }
 
 * {
@@ -225,6 +234,15 @@ button:not(:disabled):hover,
   height: 40px;
   object-fit: contain;
   display: block;
+}
+
+.brand-text {
+  display: block;
+  color: #fff;
+  font-family: var(--font-display), "Instrument Sans", sans-serif;
+  font-size: 1.05rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
 }
 
 .brand-sub {

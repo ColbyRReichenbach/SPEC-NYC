@@ -208,7 +208,7 @@ export default function SingleValuationWorkbench() {
           sale_date: selectedDetail.features.sale_date
         },
         context: {
-          dataset_version: `azuli_property:${selectedDetail.property_id}`,
+          dataset_version: `property_dataset:${selectedDetail.property_id}`,
           model_alias: "champion",
           property_id: selectedDetail.property_id
         }

@@ -7,10 +7,11 @@
     "packages/*"
   ],
   "scripts": {
+    "frontend:guard:brand": "bash scripts/check_brand_literals.sh",
     "frontend:lint": "npm run -w web lint",
     "frontend:typecheck": "npm run -w web typecheck",
     "frontend:test:contracts": "npm run -w web test:contracts",
-    "frontend:ci": "npm run frontend:lint && npm run frontend:typecheck && npm run frontend:test:contracts"
+    "frontend:ci": "npm run frontend:guard:brand && npm run frontend:lint && npm run frontend:typecheck && npm run frontend:test:contracts"
   },
   "dependencies": {
     "rollup": "^4.52.5"

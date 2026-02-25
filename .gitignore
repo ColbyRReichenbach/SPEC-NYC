@@ -60,6 +60,10 @@ Thumbs.db
 
 # ----- Node / Frontend -----
 node_modules/
+.next/
+.turbo/
+coverage/
+.eslintcache
 web/.next/
 web/.turbo/
 web/coverage/

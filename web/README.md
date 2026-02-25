@@ -1,4 +1,4 @@
-# Web App (Azuli-Branded, Canonical-Contract Frontend)
+# Web App (Canonical-Contract Frontend)
 
 This directory contains the production AVM dashboard built on Next.js App Router + BFF.
 
@@ -36,13 +36,9 @@ API routes:
 - `GET /api/v1/properties/nearby`
 - `GET /api/v1/properties/{propertyId}`
 - `GET /api/v1/governance/status`
-- `GET /api/v1/governance/proposals/latest`
-- `POST /api/v1/governance/proposals/{proposalId}/approve` (disabled/no-auth)
-- `POST /api/v1/governance/proposals/{proposalId}/reject` (disabled/no-auth)
 - `GET /api/v1/monitoring/overview`
 - `GET /api/v1/monitoring/drift`
 - `GET /api/v1/monitoring/performance`
-- `GET /api/v1/monitoring/retrain-decision/latest`
 - `POST /api/v1/copilot/ask`
 
 ## Contracts

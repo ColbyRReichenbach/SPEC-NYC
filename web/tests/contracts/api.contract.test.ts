@@ -81,7 +81,7 @@ describe("canonical contract hardening", () => {
         sale_date: "2026-02-23"
       },
       context: {
-        dataset_version: "azuli_unknown_source_v1",
+        dataset_version: "unknown_source_v1",
         model_alias: "champion"
       }
     });
@@ -146,7 +146,7 @@ describe("provider swap resilience", () => {
   it("normalizes provider A and provider B valuations to identical UI core", () => {
     const providerA = singleValuationResponseSchema.parse({
       ...valuationPayload,
-      ...meta("rdb", "azuli_rdb_1")
+      ...meta("rdb", "client_rdb_1")
     });
     const providerB = singleValuationResponseSchema.parse({
       ...valuationPayload,
@@ -158,7 +158,7 @@ describe("provider swap resilience", () => {
 
   it("normalizes monitoring payload independent of source context", () => {
     const monitoringA = monitoringOverviewSchema.parse({
-      ...meta("rdb", "azuli_rdb_1"),
+      ...meta("rdb", "client_rdb_1"),
       window: "30d",
       drift_summary: {
         status: "alert",

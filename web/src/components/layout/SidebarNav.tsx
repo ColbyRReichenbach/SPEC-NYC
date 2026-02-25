@@ -5,6 +5,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 
+import { useBrandProfile } from "@/src/components/providers/BrandProvider";
+
 const SIDEBAR_STORAGE_KEY = "spec_dashboard_sidebar_collapsed";
 
 const navItems = [
@@ -21,6 +23,7 @@ function isActive(pathname: string, href: string) {
 export default function SidebarNav() {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
+  const { profile } = useBrandProfile();
 
   useEffect(() => {
     try {
@@ -49,8 +52,19 @@ export default function SidebarNav() {
     <aside className={`dashboard-nav${collapsed ? " collapsed" : ""}`} aria-label="Dashboard navigation">
       <div className="dashboard-nav-header">
         <div className="brand-lockup">
-          <Image src="/brand/azuli-logo-white.png" alt="Azuli" width={180} height={56} priority className="brand-logo" />
-          <span className="brand-sub">Valuation Intelligence</span>
+          {profile.logoPath ? (
+            <Image
+              src={profile.logoPath}
+              alt={profile.logoAlt ?? profile.appName}
+              width={180}
+              height={56}
+              priority
+              className="brand-logo"
+            />
+          ) : (
+            <span className="brand-text">{profile.appName}</span>
+          )}
+          <span className="brand-sub">{profile.navSubtitle}</span>
         </div>
         <button
           type="button"
