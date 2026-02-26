@@ -17,7 +17,7 @@ Hypothesis-driven Data Science + MLOps with contracts, governance, and release g
 Built by **Colby Reichenbach**
 
 [![LinkedIn](https://img.shields.io/badge/LinkedIn-Connect-0077B5?style=flat-square&logo=linkedin&logoColor=white)](https://www.linkedin.com/in/colby-reichenbach/)
-[![Portfolio](https://img.shields.io/badge/Portfolio%20-%20Check%20Out%20My%20Work?style=flat-square&label=Check%20Out%20My%20Work&color=4B9CD3)](https://colbyrreichenbach.github.io/)
+[![Portfolio](https://img.shields.io/badge/Portfolio-Check%20Out%20My%20Work-4B9CD3?style=flat-square&logo=githubpages&logoColor=white)](https://colbyrreichenbach.github.io/)
 [![GitHub](https://img.shields.io/badge/GitHub-Follow-181717?style=flat-square&logo=github&logoColor=white)](https://github.com/ColbyRReichenbach)
 
 </div>
