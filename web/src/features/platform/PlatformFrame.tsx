@@ -82,7 +82,7 @@ export function PlatformFrame({ appName, data, children }: PlatformFrameProps) {
         </nav>
         <div className="sidebar-evidence">
           <FileSearch size={18} aria-hidden="true" />
-          <span>Latest package</span>
+          <span>{data.package.selection?.source.replaceAll("_", " ") ?? "resolved package"}</span>
           <strong>{data.package.modelVersion}</strong>
           <code>{data.package.id}</code>
         </div>

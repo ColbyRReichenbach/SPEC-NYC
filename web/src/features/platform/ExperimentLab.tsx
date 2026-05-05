@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 
 import type { PlatformData } from "@/src/features/platform/data";
+import { DEFAULT_PLATFORM_OPTIONS } from "@/src/features/platform/platformOptions";
 import type { ExperimentRunBundle } from "@/src/features/platform/experimentRegistry";
 
 type ExperimentForm = {
@@ -67,6 +68,22 @@ const presets = [
 ];
 
 export function ExperimentLabView({ data }: { data: PlatformData }) {
+  const options = data.options ?? DEFAULT_PLATFORM_OPTIONS;
+  const dynamicPresets = data.eda.hypotheses.length
+    ? data.eda.hypotheses.slice(0, 3).map((hypothesis) => ({
+        label: hypothesis.category,
+        hypothesis: hypothesis.statement,
+        expectedEffect: hypothesis.expectedEffect,
+        segment: hypothesis.segment,
+        modelFamily: hypothesis.modelFamily,
+        trialBudget: hypothesis.trialBudget
+      }))
+    : presets;
+  const segmentOptions = uniqueSorted([
+    "ALL",
+    ...data.package.segmentMetrics.map((row) => row.name),
+    ...data.eda.segmentRegion.map((row) => row.propertySegment)
+  ]);
   const [form, setForm] = useState<ExperimentForm>(initialForm);
   const [experiments, setExperiments] = useState<ExperimentRunBundle[]>([]);
   const [activeExperiment, setActiveExperiment] = useState<ExperimentRunBundle | null>(null);
@@ -243,8 +260,8 @@ export function ExperimentLabView({ data }: { data: PlatformData }) {
           </div>
 
           <div className="preset-row" aria-label="Experiment presets">
-            {presets.map((preset) => (
-              <button key={preset.label} type="button" onClick={() => applyPreset(preset)}>
+            {dynamicPresets.map((preset, index) => (
+              <button key={`${preset.label}-${index}-${preset.hypothesis}`} type="button" onClick={() => applyPreset(preset)}>
                 <Beaker size={14} aria-hidden="true" />
                 {preset.label}
               </button>
@@ -277,39 +294,33 @@ export function ExperimentLabView({ data }: { data: PlatformData }) {
             <label className="field-stack">
               Segment
               <select value={form.segment} onChange={(event) => setForm({ ...form, segment: event.target.value })}>
-                <option>ALL</option>
-                <option>SINGLE_FAMILY</option>
-                <option>SMALL_MULTI</option>
-                <option>WALKUP</option>
-                <option>ELEVATOR</option>
+                {segmentOptions.map((segment) => (
+                  <option key={segment}>{segment}</option>
+                ))}
               </select>
             </label>
             <label className="field-stack">
               Primary metric
               <select value={form.primaryMetric} onChange={(event) => setForm({ ...form, primaryMetric: event.target.value })}>
-                <option>MdAPE</option>
-                <option>PPE10</option>
-                <option>R2</option>
-                <option>Slice parity</option>
+                {options.experiments.primary_metrics.map((metric) => (
+                  <option key={metric}>{metric}</option>
+                ))}
               </select>
             </label>
             <label className="field-stack">
               Model family
               <select value={form.modelFamily} onChange={(event) => setForm({ ...form, modelFamily: event.target.value })}>
-                <option>XGBoost segment specialist</option>
-                <option>Global XGBoost baseline</option>
-                <option>Ablation study</option>
-                <option>Temporal residual model</option>
-                <option>Neural tabular prototype</option>
+                {options.experiments.model_families.map((family) => (
+                  <option key={family}>{family}</option>
+                ))}
               </select>
             </label>
             <label className="field-stack">
               Validation plan
               <select value={form.validationPlan} onChange={(event) => setForm({ ...form, validationPlan: event.target.value })}>
-                <option>Time split + borough/segment slices</option>
-                <option>Backtest by sale quarter</option>
-                <option>Ablation against v2 baseline</option>
-                <option>Stress test high-missingness slices</option>
+                {options.experiments.validation_plans.map((plan) => (
+                  <option key={plan}>{plan}</option>
+                ))}
               </select>
             </label>
           </div>
@@ -398,7 +409,7 @@ export function ExperimentLabView({ data }: { data: PlatformData }) {
                     endpoint: `/api/v1/experiments/${experiment.id}/review`,
                     body: {
                       decision: "approved",
-                      reviewer: "local_reviewer",
+                      reviewer: options.identity.model_risk_reviewer,
                       reason: "Approved for controlled challenger training with locked data contract."
                     },
                     successMessage: "Review approval written."
@@ -410,7 +421,7 @@ export function ExperimentLabView({ data }: { data: PlatformData }) {
                     endpoint: `/api/v1/experiments/${experiment.id}/review`,
                     body: {
                       decision: "rejected",
-                      reviewer: "local_reviewer",
+                      reviewer: options.identity.model_risk_reviewer,
                       reason: "Rejected from dashboard review."
                     },
                     successMessage: "Review rejection written."
@@ -688,4 +699,8 @@ function shortHash(value: string | undefined) {
 
 function formatExperimentStatus(status: ExperimentRunBundle["status"]) {
   return status.replaceAll("_", " ");
+}
+
+function uniqueSorted(values: string[]) {
+  return Array.from(new Set(values.filter(Boolean).map((value) => value.toUpperCase()))).sort();
 }

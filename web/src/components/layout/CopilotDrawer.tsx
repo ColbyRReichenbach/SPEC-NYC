@@ -93,7 +93,7 @@ export default function CopilotDrawer() {
     } catch (error) {
       setAnswer(`Copilot request failed: ${error instanceof Error ? error.message : "unknown error"}`);
       setCitations([]);
-      setLimitations(["Fallback to static evidence summaries while connection issues are resolved."]);
+      setLimitations(["Artifact-grounded Copilot evidence is unavailable while connection issues are resolved."]);
       setActions([]);
       setSafetyMode("fallback_template");
       setResponseSource("fallback");

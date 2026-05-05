@@ -621,6 +621,36 @@ button {
   transition: width 260ms var(--ease);
 }
 
+.valuation-result-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.valuation-result-grid > div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: #ffffff;
+}
+
+.valuation-result-grid span {
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.valuation-result-grid strong,
+.valuation-result-grid code {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
 .evidence-list {
   display: grid;
   gap: 10px;

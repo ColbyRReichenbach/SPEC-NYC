@@ -4,6 +4,8 @@ import { useCallback, useEffect, useState } from "react";
 import { CheckCircle2, GitCompareArrows, PackageCheck, ShieldCheck, XCircle } from "lucide-react";
 
 import type { ExperimentRunBundle } from "@/src/features/platform/experimentRegistry";
+import type { PlatformData } from "@/src/features/platform/data";
+import { DEFAULT_PLATFORM_OPTIONS } from "@/src/features/platform/platformOptions";
 import type { ChampionAlias, ReleaseProposal } from "@/src/features/platform/releaseRegistry";
 
 type GovernanceState = {
@@ -12,7 +14,8 @@ type GovernanceState = {
   champion: ChampionAlias;
 };
 
-export function ReleaseGovernancePanel() {
+export function ReleaseGovernancePanel({ data }: { data: PlatformData }) {
+  const options = data.options ?? DEFAULT_PLATFORM_OPTIONS;
   const [state, setState] = useState<GovernanceState | null>(null);
   const [selectedExperimentId, setSelectedExperimentId] = useState("");
   const [selectedProposalId, setSelectedProposalId] = useState("");
@@ -188,7 +191,7 @@ export function ReleaseGovernancePanel() {
               onClick={() =>
                 mutate(
                   `/api/v1/governance/proposals/${selectedProposalId}/approve`,
-                  { reason: decisionReason, decidedBy: "local_release_owner" },
+                  { reason: decisionReason, decidedBy: options.identity.release_owner },
                   "Release proposal approved and champion registry updated."
                 )
               }
@@ -203,7 +206,7 @@ export function ReleaseGovernancePanel() {
               onClick={() =>
                 mutate(
                   `/api/v1/governance/proposals/${selectedProposalId}/reject`,
-                  { reason: decisionReason || "Rejected by local release owner.", decidedBy: "local_release_owner" },
+                  { reason: decisionReason || "Rejected by release owner.", decidedBy: options.identity.release_owner },
                   "Release proposal rejected."
                 )
               }

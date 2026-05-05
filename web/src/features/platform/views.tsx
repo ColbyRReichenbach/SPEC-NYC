@@ -93,7 +93,7 @@ export function GovernanceView({ data }: { data: PlatformData }) {
           </div>
         </section>
       </div>
-      <ReleaseGovernancePanel />
+      <ReleaseGovernancePanel data={data} />
     </div>
   );
 }
@@ -315,21 +315,32 @@ function HeroBand({ data }: { data: PlatformData }) {
 }
 
 function EvidenceRail({ data }: { data: PlatformData }) {
+  const isApproved = data.package.status === "approved";
+  const heading = isApproved
+    ? "Approved champion package"
+    : data.package.status === "missing"
+      ? "No model package available"
+      : "Candidate package under governance";
+  const pillTone = isApproved ? "pass" : data.package.status === "missing" ? "fail" : "warn";
   return (
     <section className="panel">
       <div className="panel-heading">
         <div>
           <span className="eyebrow">Evidence State</span>
-          <h2>Candidate package, not production</h2>
+          <h2>{heading}</h2>
         </div>
-        <span className="status-pill warn">pending</span>
+        <span className={`status-pill ${pillTone}`}>{data.package.status}</span>
       </div>
       <dl className="evidence-list">
         <div><dt>Package ID</dt><dd><code>{data.package.id}</code></dd></div>
+        <div><dt>Resolver</dt><dd>{data.package.selection?.source ?? "unknown"}</dd></div>
         <div><dt>Release decision</dt><dd>{data.package.decision}</dd></div>
         <div><dt>Raw source rows</dt><dd>{data.etl.rawRows.toLocaleString()}</dd></div>
         <div><dt>Unique properties</dt><dd>{data.etl.uniqueProperties.toLocaleString()}</dd></div>
         <div><dt>Blocked gates</dt><dd>{data.release.gates.filter((gate) => gate.status !== "done").length}</dd></div>
+        {data.package.selection?.fallbackReason ? (
+          <div><dt>Fallback reason</dt><dd>{data.package.selection.fallbackReason}</dd></div>
+        ) : null}
       </dl>
     </section>
   );
