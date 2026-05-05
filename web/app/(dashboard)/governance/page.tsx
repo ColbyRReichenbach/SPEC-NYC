@@ -1,5 +1,7 @@
-import GovernanceReadView from "@/src/features/governance/components/GovernanceReadView";
+import { loadPlatformData } from "@/src/features/platform/data";
+import { GovernanceView } from "@/src/features/platform/views";
 
-export default function GovernancePage() {
-  return <GovernanceReadView />;
+export default async function GovernancePage() {
+  const data = await loadPlatformData();
+  return <GovernanceView data={data} />;
 }

@@ -8,11 +8,13 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "test:contracts": "vitest run tests/contracts"
+    "test:contracts": "vitest run tests/contracts",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@vitest/utils": "^2.1.1",
     "csv-parse": "^5.5.6",
+    "lucide-react": "^1.14.0",
     "maplibre-gl": "^4.7.1",
     "next": "^14.2.15",
     "react": "18.2.0",
@@ -23,6 +25,7 @@
     "zod": "3.23.8"
   },
   "devDependencies": {
+    "@playwright/test": "^1.59.1",
     "@types/node": "20.16.5",
     "@types/react": "18.3.5",
     "@types/react-dom": "18.3.0",
