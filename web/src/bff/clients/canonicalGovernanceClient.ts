@@ -1,5 +1,6 @@
 import type { SourceContext } from "@/src/bff/types/baseContracts";
-import { latestArtifactPath, readJsonArtifact } from "@/src/bff/clients/artifactStore";
+import { resolveRepoRoot } from "@/src/bff/clients/artifactStore";
+import { listGovernanceState, type ReleaseProposal } from "@/src/features/platform/releaseRegistry";
 
 type ProposalCandidate = {
   run_id: string;
@@ -9,27 +10,9 @@ type ProposalCandidate = {
   overall_ppe10_lift: number;
   max_major_segment_ppe10_drop: number;
   min_major_segment_ppe10: number;
-  drift_alert_delta: number;
-  fairness_alert_delta: number;
+  drift_alert_delta: number | null;
+  fairness_alert_delta: number | null;
 };
-
-type ProposalPayload = {
-  proposal_id: string;
-  status: string;
-  created_at_utc: string;
-  expires_at_utc: string;
-  champion: { run_id: string; model_version: string };
-  winner: { run_id: string; model_version: string } | null;
-  candidates_ranked: ProposalCandidate[];
-};
-
-const GATE_THRESHOLDS = {
-  weighted_segment_mdape_improvement: 0.05,
-  max_major_segment_ppe10_drop: 0.02,
-  major_segment_ppe10_floor: 0.24,
-  no_new_drift_alerts: 0,
-  no_new_fairness_alerts: 0
-} as const;
 
 export async function buildCanonicalGovernanceStatus(): Promise<{
   payload: {
@@ -60,127 +43,90 @@ export async function buildCanonicalGovernanceStatus(): Promise<{
   };
   sourceContext: SourceContext;
 }> {
-  const latestProposalPath = await latestArtifactPath("reports/arena", (name) =>
-    /^proposal_.*\.json$/.test(name)
-  );
-
-  const proposal = latestProposalPath
-    ? await readJsonArtifact<ProposalPayload>(latestProposalPath)
-    : null;
-
-  const candidatesRanked = (proposal?.candidates_ranked ?? []).map((candidate) => ({
-    run_id: candidate.run_id,
-    model_version: candidate.model_version,
-    gate_pass: candidate.gate_pass,
-    weighted_segment_mdape_improvement: candidate.weighted_segment_mdape_improvement,
-    overall_ppe10_lift: candidate.overall_ppe10_lift,
-    max_major_segment_ppe10_drop: candidate.max_major_segment_ppe10_drop,
-    min_major_segment_ppe10: candidate.min_major_segment_ppe10,
-    drift_alert_delta: candidate.drift_alert_delta,
-    fairness_alert_delta: candidate.fairness_alert_delta
-  }));
-
-  const candidate = candidatesRanked[0] ?? null;
-
-  const gateResults: Array<{
-    gate_key: string;
-    label: string;
-    status: "pass" | "fail";
-    threshold: string;
-    actual: number;
-  }> = candidate
-    ? [
-        {
-          gate_key: "weighted_segment_mdape_improvement",
-          label: "Weighted segment MdAPE improvement",
-          status:
-            candidate.weighted_segment_mdape_improvement >=
-            GATE_THRESHOLDS.weighted_segment_mdape_improvement
-              ? "pass"
-              : "fail",
-          threshold: `>= ${GATE_THRESHOLDS.weighted_segment_mdape_improvement}`,
-          actual: candidate.weighted_segment_mdape_improvement
-        },
-        {
-          gate_key: "max_major_segment_ppe10_drop",
-          label: "Max major segment PPE10 drop",
-          status:
-            candidate.max_major_segment_ppe10_drop <= GATE_THRESHOLDS.max_major_segment_ppe10_drop
-              ? "pass"
-              : "fail",
-          threshold: `<= ${GATE_THRESHOLDS.max_major_segment_ppe10_drop}`,
-          actual: candidate.max_major_segment_ppe10_drop
-        },
-        {
-          gate_key: "major_segment_ppe10_floor",
-          label: "Major segment PPE10 floor",
-          status:
-            candidate.min_major_segment_ppe10 >= GATE_THRESHOLDS.major_segment_ppe10_floor
-              ? "pass"
-              : "fail",
-          threshold: `>= ${GATE_THRESHOLDS.major_segment_ppe10_floor}`,
-          actual: candidate.min_major_segment_ppe10
-        },
-        {
-          gate_key: "no_new_drift_alerts",
-          label: "No new drift alerts",
-          status: candidate.drift_alert_delta <= GATE_THRESHOLDS.no_new_drift_alerts ? "pass" : "fail",
-          threshold: `<= ${GATE_THRESHOLDS.no_new_drift_alerts}`,
-          actual: candidate.drift_alert_delta
-        },
-        {
-          gate_key: "no_new_fairness_alerts",
-          label: "No new fairness alerts",
-          status:
-            candidate.fairness_alert_delta <= GATE_THRESHOLDS.no_new_fairness_alerts ? "pass" : "fail",
-          threshold: `<= ${GATE_THRESHOLDS.no_new_fairness_alerts}`,
-          actual: candidate.fairness_alert_delta
-        }
-      ]
-    : [];
-
-  const championAlias = proposal?.champion
-    ? { model_version: proposal.champion.model_version, run_id: proposal.champion.run_id }
+  const repoRoot = await resolveRepoRoot();
+  const state = await listGovernanceState(repoRoot);
+  const latestProposal = state.proposals[0] ?? null;
+  const champion = state.champion.champion_package_id
+    ? {
+        model_version: state.champion.champion_package_id,
+        run_id: state.champion.active_proposal_id
+      }
     : { model_version: null, run_id: null };
-
-  const winner = proposal?.winner
-    ? { run_id: proposal.winner.run_id, model_version: proposal.winner.model_version }
+  const topCandidate = latestProposal ? proposalCandidate(latestProposal) : null;
+  const winner = latestProposal?.status === "approved"
+    ? {
+        run_id: latestProposal.proposal_id,
+        model_version: latestProposal.candidate.package_id
+      }
     : null;
-
-  const topCandidateAlias = candidate
-    ? { model_version: candidate.model_version, run_id: candidate.run_id }
-    : { model_version: null, run_id: null };
-
-  const statusReason = proposal
-    ? proposal.status === "approved"
-      ? "Latest proposal is approved."
-      : `Latest proposal status is '${proposal.status}'. Governance actions remain read-only in no-auth mode.`
-    : "No proposal artifact found; showing empty governance state.";
 
   return {
     payload: {
-      registered_model_name: "spec-nyc-avm",
+      registered_model_name: state.champion.registered_model_name,
       aliases: {
-        champion: championAlias,
-        challenger: { model_version: null, run_id: null },
-        candidate: topCandidateAlias
+        champion,
+        challenger: topCandidate ? { model_version: topCandidate.model_version, run_id: topCandidate.run_id } : { model_version: null, run_id: null },
+        candidate: topCandidate ? { model_version: topCandidate.model_version, run_id: topCandidate.run_id } : { model_version: null, run_id: null }
       },
-      latest_proposal: {
-        proposal_id: proposal?.proposal_id ?? "none",
-        status: proposal?.status ?? "unavailable",
-        created_at_utc: proposal?.created_at_utc ?? new Date(0).toISOString(),
-        expires_at_utc: proposal?.expires_at_utc ?? new Date(0).toISOString(),
-        champion: championAlias,
-        winner,
-        candidates_ranked: candidatesRanked
-      },
-      gate_results: gateResults,
-      status_reason: statusReason,
+      latest_proposal: latestProposal
+        ? {
+            proposal_id: latestProposal.proposal_id,
+            status: latestProposal.status,
+            created_at_utc: latestProposal.created_at_utc,
+            expires_at_utc: latestProposal.expires_at_utc,
+            champion: {
+              model_version: latestProposal.champion.package_id,
+              run_id: latestProposal.proposal_id
+            },
+            winner,
+            candidates_ranked: [proposalCandidate(latestProposal)]
+          }
+        : {
+            proposal_id: "none",
+            status: "unavailable",
+            created_at_utc: new Date(0).toISOString(),
+            expires_at_utc: new Date(0).toISOString(),
+            champion,
+            winner: null,
+            candidates_ranked: []
+          },
+      gate_results: latestProposal ? proposalGates(latestProposal) : [],
+      status_reason: latestProposal
+        ? `Latest governance proposal ${latestProposal.proposal_id} is ${latestProposal.status}.`
+        : "No release proposal exists in the governed proposal registry.",
       actions_enabled: false
     },
     sourceContext: {
-      source_id: latestProposalPath ?? "reports/arena/proposal_*.json",
+      source_id: latestProposal?.artifact_paths.release_proposal ?? "reports/governance/proposals",
       source_type: "other"
     }
   };
+}
+
+function proposalCandidate(proposal: ReleaseProposal): ProposalCandidate {
+  return {
+    run_id: proposal.experiment_id,
+    model_version: proposal.candidate.package_id,
+    gate_pass: proposal.gate_results.every((gate) => gate.status !== "fail"),
+    weighted_segment_mdape_improvement: round(proposal.champion.metrics.mdape - proposal.candidate.metrics.mdape),
+    overall_ppe10_lift: round(proposal.candidate.metrics.ppe10 - proposal.champion.metrics.ppe10),
+    max_major_segment_ppe10_drop: round(Math.max(0, proposal.champion.metrics.ppe10 - proposal.candidate.metrics.ppe10)),
+    min_major_segment_ppe10: round(proposal.candidate.metrics.ppe10),
+    drift_alert_delta: null,
+    fairness_alert_delta: null
+  };
+}
+
+function proposalGates(proposal: ReleaseProposal) {
+  return proposal.gate_results.map((gate) => ({
+    gate_key: gate.name,
+    label: gate.name.replaceAll("_", " "),
+    status: gate.status === "fail" ? "fail" as const : "pass" as const,
+    threshold: gate.detail,
+    actual: gate.status === "fail" ? 0 : 1
+  }));
+}
+
+function round(value: number) {
+  return Math.round(value * 10000) / 10000;
 }

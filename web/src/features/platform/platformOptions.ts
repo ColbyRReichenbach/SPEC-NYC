@@ -1,0 +1,44 @@
+export type PlatformOptions = {
+  valuation: {
+    model_aliases: string[];
+    boroughs: string[];
+  };
+  experiments: {
+    primary_metrics: string[];
+    model_families: string[];
+    validation_plans: string[];
+  };
+  identity: {
+    dashboard_user: string;
+    model_risk_reviewer: string;
+    release_owner: string;
+  };
+};
+
+export const DEFAULT_PLATFORM_OPTIONS: PlatformOptions = {
+  valuation: {
+    model_aliases: ["champion", "candidate"],
+    boroughs: ["MANHATTAN", "BRONX", "BROOKLYN", "QUEENS", "STATEN_ISLAND"]
+  },
+  experiments: {
+    primary_metrics: ["MdAPE", "PPE10", "R2", "Slice parity"],
+    model_families: [
+      "Global XGBoost baseline",
+      "XGBoost segment specialist",
+      "Ablation study",
+      "Temporal residual model",
+      "Neural tabular prototype"
+    ],
+    validation_plans: [
+      "Time split + borough/segment slices",
+      "Backtest by sale quarter",
+      "Ablation against v2 baseline",
+      "Stress test high-missingness slices"
+    ]
+  },
+  identity: {
+    dashboard_user: "local_dashboard_user",
+    model_risk_reviewer: "local_reviewer",
+    release_owner: "local_release_owner"
+  }
+};

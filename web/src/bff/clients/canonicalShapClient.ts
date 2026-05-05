@@ -1,18 +1,20 @@
+import { spawn } from "node:child_process";
+
 import type { SourceContext } from "@/src/bff/types/baseContracts";
-import { readJsonArtifact } from "@/src/bff/clients/artifactStore";
+import { resolveRepoRoot } from "@/src/bff/clients/artifactStore";
+import { resolveDashboardPackageSelection } from "@/src/features/platform/packageResolver";
 
-type MetricsPayload = {
-  per_segment?: Record<string, { mdape?: number; ppe10?: number }>;
+type ImportancePayload = {
+  segment: string;
+  window: string;
+  features: Array<{
+    feature_name: string;
+    mean_abs_shap: number;
+    direction_hint: "positive" | "negative" | "mixed";
+  }>;
+  generated_from: string[];
+  model_package_id: string;
 };
-
-const DEFAULT_GLOBAL_SHAP = [
-  { feature_name: "gross_square_feet", mean_abs_shap: 0.31, direction_hint: "positive" as const },
-  { feature_name: "borough", mean_abs_shap: 0.26, direction_hint: "mixed" as const },
-  { feature_name: "building_age", mean_abs_shap: 0.18, direction_hint: "negative" as const },
-  { feature_name: "total_units", mean_abs_shap: 0.11, direction_hint: "mixed" as const },
-  { feature_name: "distance_to_center_km", mean_abs_shap: 0.09, direction_hint: "negative" as const },
-  { feature_name: "month_sin", mean_abs_shap: 0.05, direction_hint: "mixed" as const }
-];
 
 export async function buildCanonicalGlobalShapSummary(input: {
   segment: string;
@@ -30,28 +32,104 @@ export async function buildCanonicalGlobalShapSummary(input: {
   };
   sourceContext: SourceContext;
 }> {
-  const metricsPath = "models/metrics_v1.json";
-  const metrics = await readJsonArtifact<MetricsPayload>(metricsPath);
+  const repoRoot = await resolveRepoRoot();
+  const selection = await resolveDashboardPackageSelection(repoRoot);
+  if (!selection.packagePath) {
+    return {
+      payload: {
+        segment: input.segment.toUpperCase(),
+        window: input.window,
+        features: [],
+        generated_from: []
+      },
+      sourceContext: {
+        source_id: selection.fallbackReason ?? "no_model_package",
+        source_type: "other"
+      }
+    };
+  }
 
-  const segment = input.segment.toUpperCase();
-  const segmentScore = metrics?.per_segment?.[segment];
-  const severity = Math.max(0.75, Math.min(1.25, 1 + (segmentScore?.mdape ?? 0.2) - 0.2));
-
-  const features = DEFAULT_GLOBAL_SHAP.map((item) => ({
-    ...item,
-    mean_abs_shap: Number((item.mean_abs_shap * severity).toFixed(4))
-  }));
-
+  const importance = await runImportanceExtractor(repoRoot, selection.packagePath, input.segment, input.window);
   return {
     payload: {
-      segment,
-      window: input.window,
-      features,
-      generated_from: [metricsPath, "reports/model/segment_scorecard_v1.csv"]
+      segment: importance.segment,
+      window: importance.window,
+      features: importance.features,
+      generated_from: importance.generated_from
     },
     sourceContext: {
-      source_id: `${metricsPath}|reports/model/segment_scorecard_v1.csv`,
+      source_id: `${selection.packagePath}|${importance.generated_from.join("|")}`,
       source_type: "other"
     }
   };
+}
+
+async function runImportanceExtractor(
+  repoRoot: string,
+  packagePath: string,
+  segment: string,
+  window: string
+): Promise<ImportancePayload> {
+  return new Promise((resolve, reject) => {
+    const child = spawn(
+      "python3",
+      [
+        "-m",
+        "src.serving.score_single",
+        "--repo-root",
+        repoRoot,
+        "--package-path",
+        packagePath,
+        "--mode",
+        "global-importance",
+        "--segment",
+        segment,
+        "--window",
+        window
+      ],
+      { cwd: repoRoot, stdio: ["ignore", "pipe", "pipe"] }
+    );
+    let stdout = "";
+    let stderr = "";
+    const timeout = setTimeout(() => {
+      child.kill("SIGKILL");
+      reject(new Error("Model importance extraction timed out."));
+    }, 30_000);
+
+    child.stdout.on("data", (chunk) => {
+      stdout += chunk.toString();
+    });
+    child.stderr.on("data", (chunk) => {
+      stderr += chunk.toString();
+    });
+    child.on("error", (error) => {
+      clearTimeout(timeout);
+      reject(error);
+    });
+    child.on("close", (code) => {
+      clearTimeout(timeout);
+      if (code !== 0) {
+        reject(new Error(parseScorerError(stderr) ?? `Model importance extraction failed with exit code ${code}.`));
+        return;
+      }
+      try {
+        resolve(JSON.parse(stdout) as ImportancePayload);
+      } catch (error) {
+        reject(error instanceof Error ? error : new Error("Unable to parse importance output."));
+      }
+    });
+  });
+}
+
+function parseScorerError(stderr: string) {
+  const trimmed = stderr.trim();
+  if (!trimmed) {
+    return null;
+  }
+  try {
+    const parsed = JSON.parse(trimmed) as { error?: string };
+    return parsed.error ?? trimmed;
+  } catch {
+    return trimmed;
+  }
 }

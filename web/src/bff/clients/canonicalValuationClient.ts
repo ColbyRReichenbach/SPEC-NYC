@@ -1,12 +1,15 @@
-import type { SourceContext } from "@/src/bff/types/baseContracts";
-import { readJsonArtifact } from "@/src/bff/clients/artifactStore";
-import type { SingleValuationRequest } from "@/src/features/valuation/schemas/valuationSchemas";
+import { spawn } from "node:child_process";
+import { createHash } from "node:crypto";
+import { promises as fs } from "node:fs";
+import path from "node:path";
 
-type MetricsPayload = {
-  overall?: { ppe10?: number; mdape?: number };
-  per_segment?: Record<string, { ppe10?: number; mdape?: number }>;
-  metadata?: { model_version?: string };
-};
+import type { SourceContext } from "@/src/bff/types/baseContracts";
+import { resolveRepoRoot } from "@/src/bff/clients/artifactStore";
+import type { SingleValuationRequest } from "@/src/features/valuation/schemas/valuationSchemas";
+import {
+  resolveModelPackageSelection,
+  type ModelAliasMode
+} from "@/src/features/platform/packageResolver";
 
 type Driver = {
   feature: string;
@@ -14,71 +17,45 @@ type Driver = {
   display: string;
 };
 
-const BOROUGH_BASE_PPSF: Record<string, number> = {
-  MANHATTAN: 1200,
-  BROOKLYN: 780,
-  QUEENS: 610,
-  BRONX: 420,
-  STATEN_ISLAND: 500
+type ScorerPayload = {
+  predicted_price: number;
+  prediction_interval: { low: number; high: number; method: string };
+  confidence: {
+    score: number;
+    band: "high" | "medium" | "low";
+    factors: {
+      segment_calibration: number;
+      support_coverage: number;
+      input_completeness: number;
+    };
+    caveats: string[];
+  };
+  explanation: {
+    status: "ready" | "degraded" | "unavailable";
+    explainer_type: string;
+    local_accuracy?: number | null;
+    drivers_positive: Driver[];
+    drivers_negative: Driver[];
+  };
+  model: {
+    run_id: string;
+    model_version: string;
+    route: string;
+    model_package_id: string;
+  };
+  evidence: {
+    model_package_path: string;
+    metrics_path: string;
+    feature_contract_path: string;
+    data_manifest_path: string;
+    model_card_path: string;
+    feature_importance_artifact: string;
+    training_source_path: string | null;
+    feature_vector_sha256: string;
+    missing_features: string[];
+    feature_generation: Record<string, unknown>;
+  };
 };
-
-function normalizeBorough(value: string): string {
-  return value.trim().toUpperCase().replace(/\s+/g, "_");
-}
-
-function bounded(value: number, min: number, max: number): number {
-  return Math.max(min, Math.min(max, value));
-}
-
-function computeDrivers(
-  grossSqft: number,
-  yearBuilt: number,
-  totalUnits: number,
-  boroughFactor: number
-): { positive: Driver[]; negative: Driver[] } {
-  const sqftImpact = Math.round(grossSqft * 42);
-  const boroughImpact = Math.round(75000 * (boroughFactor - 1));
-  const ageYears = new Date().getUTCFullYear() - yearBuilt;
-  const ageImpact = -Math.round(ageYears * 420);
-  const multiUnitPenalty = totalUnits > 8 ? -Math.round((totalUnits - 8) * 3500) : 0;
-
-  const positive: Driver[] = [
-    { feature: "gross_square_feet", impact: sqftImpact, display: "Larger interior size" },
-    { feature: "borough", impact: boroughImpact, display: "Location demand baseline" }
-  ].filter((item) => item.impact > 0);
-
-  const negative: Driver[] = [
-    { feature: "building_age", impact: ageImpact, display: "Older building profile" },
-    { feature: "total_units", impact: multiUnitPenalty, display: "Higher unit complexity" }
-  ].filter((item) => item.impact < 0);
-
-  return {
-    positive: positive.slice(0, 5),
-    negative: negative.slice(0, 5)
-  };
-}
-
-function computeConfidenceFactors(segmentPpe10?: number): {
-  segment_calibration: number;
-  support_coverage: number;
-  input_completeness: number;
-  score: number;
-  band: "high" | "medium" | "low";
-} {
-  const calibration = bounded((segmentPpe10 ?? 0.28) / 0.6, 0.25, 0.95);
-  const support = bounded((segmentPpe10 ?? 0.28) / 0.5, 0.25, 0.95);
-  const completeness = 0.9;
-  const score = Number((calibration * 0.45 + support * 0.35 + completeness * 0.2).toFixed(2));
-  const band = score >= 0.75 ? "high" : score >= 0.45 ? "medium" : "low";
-
-  return {
-    segment_calibration: Number(calibration.toFixed(2)),
-    support_coverage: Number(support.toFixed(2)),
-    input_completeness: completeness,
-    score,
-    band
-  };
-}
 
 export async function buildCanonicalValuationResponse(input: SingleValuationRequest): Promise<{
   payload: {
@@ -116,85 +93,182 @@ export async function buildCanonicalValuationResponse(input: SingleValuationRequ
   };
   sourceContext: SourceContext;
 }> {
-  const metricsPath = "models/metrics_v1.json";
-  const runCardPath = "reports/arena/run_card_34e917e198af4e58adb2097b8d9ca229.md";
-  const shapPath = "reports/model/shap_summary_v1.png";
-
-  const metrics = await readJsonArtifact<MetricsPayload>(metricsPath);
-  const borough = normalizeBorough(input.property.borough);
-  const basePpsf = BOROUGH_BASE_PPSF[borough] ?? 620;
-  const ageYears = bounded(new Date().getUTCFullYear() - input.property.year_built, 0, 150);
-  const boroughFactor = basePpsf / 620;
-
-  const ageMultiplier = bounded(1 - ageYears * 0.0012, 0.72, 1.08);
-  const unitMultiplier = input.property.total_units > 4 ? 0.94 : 1;
-  const predictedPrice = Math.round(
-    input.property.gross_square_feet * basePpsf * ageMultiplier * unitMultiplier
-  );
-
-  const lower = Math.round(predictedPrice * 0.91);
-  const upper = Math.round(predictedPrice * 1.09);
-  const segmentMetrics = metrics?.per_segment?.[input.property.property_segment];
-  const confidence = computeConfidenceFactors(segmentMetrics?.ppe10);
-  const drivers = computeDrivers(
-    input.property.gross_square_feet,
-    input.property.year_built,
-    input.property.total_units,
-    boroughFactor
-  );
-
-  const explanationStatus: "ready" | "degraded" = metrics ? "ready" : "degraded";
-  const caveats = [
-    "Estimate is probabilistic, not an appraisal.",
-    "Confidence depends on data quality and comparable coverage.",
-    "Recent regime shifts can increase uncertainty."
-  ];
-
-  if (confidence.band === "low") {
-    caveats.push("Sparse comparables or atypical feature values reduced confidence.");
+  const repoRoot = await resolveRepoRoot();
+  const requestedAlias = input.context.model_alias as ModelAliasMode;
+  const selection = await resolveModelPackageSelection(repoRoot, requestedAlias);
+  if (!selection.packagePath) {
+    throw new Error(selection.fallbackReason ?? `No ${requestedAlias} model package is available for scoring.`);
   }
 
-  return {
-    payload: {
-      valuation_id: `val_${crypto.randomUUID().slice(0, 12)}`,
-      predicted_price: predictedPrice,
-      prediction_interval: {
-        low: lower,
-        high: upper,
-        method: "quantile_residual_v1"
-      },
-      confidence: {
-        score: confidence.score,
-        band: confidence.band,
-        factors: {
-          segment_calibration: confidence.segment_calibration,
-          support_coverage: confidence.support_coverage,
-          input_completeness: confidence.input_completeness
-        },
-        caveats
-      },
-      explanation: {
-        status: explanationStatus,
-        explainer_type: explanationStatus === "ready" ? "xgboost_pred_contribs" : "heuristic_delta_v1",
-        local_accuracy: explanationStatus === "ready" ? 0.86 : 0.52,
-        drivers_positive: drivers.positive,
-        drivers_negative: drivers.negative
-      },
-      model: {
-        alias: input.context.model_alias,
-        run_id: "34e917e198af4e58adb2097b8d9ca229",
-        model_version: metrics?.metadata?.model_version ?? "v1",
-        route: input.property.property_segment
-      },
-      evidence: {
-        run_card_path: runCardPath,
-        metrics_path: metricsPath,
-        shap_summary_path: shapPath
-      }
+  const scorer = await runPythonScorer(repoRoot, selection.packagePath, input);
+  const valuationId = buildValuationId(input, scorer.evidence.feature_vector_sha256);
+  const explanation = {
+    ...scorer.explanation,
+    local_accuracy: scorer.explanation.local_accuracy ?? undefined
+  };
+
+  const payload = {
+    valuation_id: valuationId,
+    predicted_price: scorer.predicted_price,
+    prediction_interval: scorer.prediction_interval,
+    confidence: scorer.confidence,
+    explanation,
+    model: {
+      alias: requestedAlias,
+      run_id: scorer.model.run_id,
+      model_version: scorer.model.model_version,
+      route: scorer.model.route
     },
+    evidence: {
+      run_card_path: scorer.evidence.model_card_path,
+      metrics_path: scorer.evidence.metrics_path,
+      shap_summary_path: scorer.evidence.feature_importance_artifact
+    }
+  };
+
+  await persistValuation(repoRoot, {
+    valuation_id: valuationId,
+    created_at_utc: new Date().toISOString(),
+    request: input,
+    package_selection: selection,
+    payload,
+    scorer_evidence: scorer.evidence
+  });
+
+  return {
+    payload,
     sourceContext: {
-      source_id: input.context.dataset_version,
+      source_id: `${selection.packagePath}|${scorer.evidence.feature_vector_sha256}`,
       source_type: "other"
     }
   };
+}
+
+export async function readStoredValuationExplanation(valuationId: string): Promise<{
+  explanation: {
+    status: "ready" | "degraded" | "unavailable";
+    explainer_type: string;
+    drivers_positive: Driver[];
+    drivers_negative: Driver[];
+  };
+  sourceContext: SourceContext;
+} | null> {
+  const repoRoot = await resolveRepoRoot();
+  const safeId = assertValuationId(valuationId);
+  const recordPath = path.join(repoRoot, "reports/valuations", `${safeId}.json`);
+  try {
+    const record = JSON.parse(await fs.readFile(recordPath, "utf-8")) as {
+      package_selection?: { packagePath?: string | null };
+      scorer_evidence?: { feature_vector_sha256?: string };
+      payload?: {
+        explanation?: {
+          status: "ready" | "degraded" | "unavailable";
+          explainer_type: string;
+          drivers_positive: Driver[];
+          drivers_negative: Driver[];
+        };
+      };
+    };
+    if (!record.payload?.explanation) {
+      return null;
+    }
+    return {
+      explanation: record.payload.explanation,
+      sourceContext: {
+        source_id: `${record.package_selection?.packagePath ?? "unknown_package"}|${record.scorer_evidence?.feature_vector_sha256 ?? safeId}`,
+        source_type: "other"
+      }
+    };
+  } catch {
+    return null;
+  }
+}
+
+async function runPythonScorer(
+  repoRoot: string,
+  packagePath: string,
+  input: SingleValuationRequest
+): Promise<ScorerPayload> {
+  return new Promise((resolve, reject) => {
+    const child = spawn(
+      "python3",
+      ["-m", "src.serving.score_single", "--repo-root", repoRoot, "--package-path", packagePath],
+      { cwd: repoRoot, stdio: ["pipe", "pipe", "pipe"] }
+    );
+    let stdout = "";
+    let stderr = "";
+    const timeout = setTimeout(() => {
+      child.kill("SIGKILL");
+      reject(new Error("Model scorer timed out."));
+    }, 30_000);
+
+    child.stdout.on("data", (chunk) => {
+      stdout += chunk.toString();
+    });
+    child.stderr.on("data", (chunk) => {
+      stderr += chunk.toString();
+    });
+    child.on("error", (error) => {
+      clearTimeout(timeout);
+      reject(error);
+    });
+    child.on("close", (code) => {
+      clearTimeout(timeout);
+      if (code !== 0) {
+        reject(new Error(parseScorerError(stderr) ?? `Model scorer failed with exit code ${code}.`));
+        return;
+      }
+      try {
+        resolve(JSON.parse(stdout) as ScorerPayload);
+      } catch (error) {
+        reject(error instanceof Error ? error : new Error("Unable to parse model scorer output."));
+      }
+    });
+    child.stdin.end(JSON.stringify(input));
+  });
+}
+
+async function persistValuation(repoRoot: string, record: Record<string, unknown>) {
+  const id = assertValuationId(String(record.valuation_id));
+  const dir = path.join(repoRoot, "reports/valuations");
+  await fs.mkdir(dir, { recursive: true });
+  await fs.writeFile(path.join(dir, `${id}.json`), `${JSON.stringify(record, null, 2)}\n`);
+  await fs.appendFile(
+    path.join(dir, "audit_log.jsonl"),
+    `${JSON.stringify({
+      event: "valuation_scored",
+      created_at_utc: record.created_at_utc,
+      valuation_id: id,
+      package_path: (record.package_selection as { packagePath?: string })?.packagePath,
+      feature_vector_sha256: (record.scorer_evidence as { feature_vector_sha256?: string })?.feature_vector_sha256
+    })}\n`
+  );
+}
+
+function buildValuationId(input: SingleValuationRequest, featureVectorSha: string) {
+  const digest = createHash("sha256")
+    .update(JSON.stringify({ input, featureVectorSha, createdAt: new Date().toISOString() }))
+    .digest("hex")
+    .slice(0, 16);
+  return `val_${digest}`;
+}
+
+function assertValuationId(value: string) {
+  if (!/^val_[a-f0-9]{8,32}$/i.test(value)) {
+    throw new Error("Invalid valuation id.");
+  }
+  return value;
+}
+
+function parseScorerError(stderr: string) {
+  const trimmed = stderr.trim();
+  if (!trimmed) {
+    return null;
+  }
+  try {
+    const parsed = JSON.parse(trimmed) as { error?: string };
+    return parsed.error ?? trimmed;
+  } catch {
+    return trimmed;
+  }
 }

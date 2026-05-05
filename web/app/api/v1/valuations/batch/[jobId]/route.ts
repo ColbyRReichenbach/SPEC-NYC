@@ -1,13 +1,22 @@
-import { okJson } from "@/src/lib/http";
+import { readBatchValuationJob } from "@/src/bff/clients/batchValuationClient";
+import { errorJson, okJson } from "@/src/lib/http";
 
 export async function GET(_: Request, { params }: { params: { jobId: string } }) {
-  return okJson({
-    job_id: params.jobId,
-    status: "running",
-    submitted_at: new Date(Date.now() - 15000).toISOString(),
-    processed_rows: 4200,
-    total_rows: 12000,
-    success_rows: 4125,
-    error_rows: 75
+  let job;
+  try {
+    job = await readBatchValuationJob(params.jobId);
+  } catch (error) {
+    return errorJson(error instanceof Error ? error.message : "Invalid batch job id.", 400);
+  }
+
+  if (!job) {
+    return errorJson(`Batch valuation job not found: ${params.jobId}.`, 404);
+  }
+
+  return okJson(job, 200, {
+    source_context: {
+      source_id: `reports/valuations/batch/${job.job_id}.json`,
+      source_type: "other"
+    }
   });
 }

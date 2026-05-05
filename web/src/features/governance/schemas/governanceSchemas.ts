@@ -18,8 +18,8 @@ const candidateRankSchema = z
     overall_ppe10_lift: z.number(),
     max_major_segment_ppe10_drop: z.number(),
     min_major_segment_ppe10: z.number(),
-    drift_alert_delta: z.number(),
-    fairness_alert_delta: z.number()
+    drift_alert_delta: z.number().nullable(),
+    fairness_alert_delta: z.number().nullable()
   })
   .strict();
 

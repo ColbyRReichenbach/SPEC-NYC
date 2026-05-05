@@ -12,7 +12,12 @@ export async function POST(req: Request) {
     return errorJson(`Invalid payload: ${parsedRequest.error.issues[0]?.message ?? "unknown error"}`);
   }
 
-  const canonical = await buildCanonicalValuationResponse(parsedRequest.data);
+  let canonical: Awaited<ReturnType<typeof buildCanonicalValuationResponse>>;
+  try {
+    canonical = await buildCanonicalValuationResponse(parsedRequest.data);
+  } catch (error) {
+    return errorJson(error instanceof Error ? error.message : "Model-backed valuation failed.", 409);
+  }
   const parsedResponse = singleValuationResponseSchema.parse({
     ...canonical.payload,
     contract_version: "v1",

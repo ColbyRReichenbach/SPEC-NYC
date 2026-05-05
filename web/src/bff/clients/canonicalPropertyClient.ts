@@ -3,9 +3,12 @@ import { parse } from "csv-parse/sync";
 import type { SourceContext } from "@/src/bff/types/baseContracts";
 import {
   latestArtifactPath,
+  resolveRepoRoot,
+  readJsonArtifact,
   readTextArtifact,
   readTextArtifactHead
 } from "@/src/bff/clients/artifactStore";
+import { resolveDashboardPackageSelection } from "@/src/features/platform/packageResolver";
 
 type RawRow = Record<string, string | undefined>;
 
@@ -138,10 +141,22 @@ function requiredMissing(features: CanonicalPropertyRecord["features"]): string[
 }
 
 async function resolvePropertyDatasetPath(): Promise<string> {
+  const root = await resolveRepoRoot();
+  const selection = await resolveDashboardPackageSelection(root);
+  if (selection.packagePath) {
+    const manifest = await readJsonArtifact<{ sources?: Array<{ uri?: string }> }>(
+      `${selection.packagePath}/data_manifest.json`
+    );
+    const sourcePath = manifest?.sources?.find((source) => source.uri)?.uri;
+    if (sourcePath) {
+      return sourcePath;
+    }
+  }
+
   const latestTrainPath = await latestArtifactPath("data/processed", (name) =>
     /_train_\d{8}\.csv$/i.test(name)
   );
-  return latestTrainPath ?? "data/processed/hseason001_train_20260223.csv";
+  return latestTrainPath ?? "data/processed/nyc_sales_2019_2024_avm_training.csv";
 }
 
 function toSourceContext(sourcePath: string): SourceContext {

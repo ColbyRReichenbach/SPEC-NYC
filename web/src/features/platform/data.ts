@@ -4,6 +4,14 @@ import path from "node:path";
 import { parse } from "csv-parse/sync";
 
 import { resolveRepoRoot } from "@/src/bff/clients/artifactStore";
+import {
+  resolveDashboardPackageSelection,
+  type ResolvedModelPackageSelection
+} from "@/src/features/platform/packageResolver";
+import {
+  DEFAULT_PLATFORM_OPTIONS,
+  type PlatformOptions
+} from "@/src/features/platform/platformOptions";
 
 type JsonObject = Record<string, any>;
 
@@ -203,6 +211,7 @@ export type PlatformData = {
     sources: Array<{ name: string; uri: string; rowCount: number }>;
     segmentMetrics: SliceMetric[];
     tierMetrics: SliceMetric[];
+    selection?: ResolvedModelPackageSelection;
   };
   etl: {
     reportPath: string;
@@ -258,6 +267,7 @@ export type PlatformData = {
     artifactLinks: EdaArtifactLink[];
     tables: EdaDisplayTable[];
   };
+  options?: PlatformOptions;
 };
 
 const EMPTY_PACKAGE: PlatformData["package"] = {
@@ -358,11 +368,12 @@ const EMPTY_EDA: PlatformData["eda"] = {
 
 export async function loadPlatformData(): Promise<PlatformData> {
   const repoRoot = await resolveRepoRoot();
-  const [modelPackage, etl, release, eda] = await Promise.all([
-    loadLatestPackage(repoRoot),
+  const [modelPackage, etl, release, eda, options] = await Promise.all([
+    loadDashboardPackage(repoRoot),
     loadLatestEtl(repoRoot),
     loadReleaseReadiness(repoRoot),
-    loadLatestEdaAnalysis(repoRoot)
+    loadLatestEdaAnalysis(repoRoot),
+    loadPlatformOptions(repoRoot)
   ]);
 
   return {
@@ -370,15 +381,24 @@ export async function loadPlatformData(): Promise<PlatformData> {
     package: modelPackage,
     etl,
     release,
-    eda
+    eda,
+    options
   };
 }
 
-async function loadLatestPackage(repoRoot: string): Promise<PlatformData["package"]> {
-  const packageRel = await latestDirectory(repoRoot, "models/packages", (name) => name.startsWith("spec_nyc_avm_"));
-  if (!packageRel) {
-    return EMPTY_PACKAGE;
+async function loadDashboardPackage(repoRoot: string): Promise<PlatformData["package"]> {
+  const selection = await resolveDashboardPackageSelection(repoRoot);
+  if (!selection.packagePath) {
+    return { ...EMPTY_PACKAGE, selection };
   }
+  return loadPackage(repoRoot, selection.packagePath, selection);
+}
+
+async function loadPackage(
+  repoRoot: string,
+  packageRel: string,
+  selection?: ResolvedModelPackageSelection
+): Promise<PlatformData["package"]> {
 
   const [
     metrics,
@@ -467,7 +487,8 @@ async function loadLatestPackage(repoRoot: string): Promise<PlatformData["packag
     },
     sources,
     segmentMetrics: metricsToRows(metrics?.per_segment),
-    tierMetrics: metricsToRows(metrics?.per_price_tier)
+    tierMetrics: metricsToRows(metrics?.per_price_tier),
+    selection
   };
 }
 
@@ -627,6 +648,30 @@ async function loadLatestEdaAnalysis(repoRoot: string): Promise<PlatformData["ed
     artifactLinks,
     tables: buildEdaDisplayTables({ errorSlices, featureSignals, segmentRegion, quarterlyTrends })
   };
+}
+
+async function loadPlatformOptions(repoRoot: string): Promise<PlatformOptions> {
+  const configured = await readJson<Partial<PlatformOptions>>(repoRoot, "config/platform_options.json");
+  return {
+    valuation: {
+      model_aliases: arrayOrDefault(configured?.valuation?.model_aliases, DEFAULT_PLATFORM_OPTIONS.valuation.model_aliases),
+      boroughs: arrayOrDefault(configured?.valuation?.boroughs, DEFAULT_PLATFORM_OPTIONS.valuation.boroughs)
+    },
+    experiments: {
+      primary_metrics: arrayOrDefault(configured?.experiments?.primary_metrics, DEFAULT_PLATFORM_OPTIONS.experiments.primary_metrics),
+      model_families: arrayOrDefault(configured?.experiments?.model_families, DEFAULT_PLATFORM_OPTIONS.experiments.model_families),
+      validation_plans: arrayOrDefault(configured?.experiments?.validation_plans, DEFAULT_PLATFORM_OPTIONS.experiments.validation_plans)
+    },
+    identity: {
+      dashboard_user: String(configured?.identity?.dashboard_user ?? DEFAULT_PLATFORM_OPTIONS.identity.dashboard_user),
+      model_risk_reviewer: String(configured?.identity?.model_risk_reviewer ?? DEFAULT_PLATFORM_OPTIONS.identity.model_risk_reviewer),
+      release_owner: String(configured?.identity?.release_owner ?? DEFAULT_PLATFORM_OPTIONS.identity.release_owner)
+    }
+  };
+}
+
+function arrayOrDefault(value: unknown, fallback: string[]): string[] {
+  return Array.isArray(value) && value.length > 0 ? value.map(String) : fallback;
 }
 
 async function loadEdaRunSummaries(repoRoot: string): Promise<EdaRunSummary[]> {

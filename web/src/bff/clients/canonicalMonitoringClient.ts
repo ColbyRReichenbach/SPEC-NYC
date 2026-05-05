@@ -1,5 +1,6 @@
 import type { SourceContext } from "@/src/bff/types/baseContracts";
-import { readJsonArtifact } from "@/src/bff/clients/artifactStore";
+import { readJsonArtifact, resolveRepoRoot } from "@/src/bff/clients/artifactStore";
+import { resolveDashboardPackageSelection } from "@/src/features/platform/packageResolver";
 
 type PerformancePayload = {
   status?: string;
@@ -65,45 +66,57 @@ export async function buildCanonicalMonitoringOverview(window: string): Promise<
   };
   sourceContext: SourceContext;
 }> {
+  const repoRoot = await resolveRepoRoot();
+  const selection = await resolveDashboardPackageSelection(repoRoot);
+  const packagePath = selection.packagePath;
+  const packageMetricsPath = packagePath ? `${packagePath}/metrics.json` : "missing";
+  const packageDriftPath = packagePath ? `${packagePath}/drift_report.json` : "missing";
   const perfPath = "reports/monitoring/performance_latest.json";
   const driftPath = "reports/monitoring/drift_latest.json";
   const retrainPath = "reports/releases/retrain_decision_latest.json";
 
-  const [performance, drift, retrain] = await Promise.all([
+  const [performance, drift, retrain, packageMetrics, packageDrift] = await Promise.all([
     readJsonArtifact<PerformancePayload>(perfPath),
     readJsonArtifact<DriftPayload>(driftPath),
-    readJsonArtifact<RetrainPayload>(retrainPath)
+    readJsonArtifact<RetrainPayload>(retrainPath),
+    packagePath ? readJsonArtifact<PerformancePayload>(packageMetricsPath) : Promise.resolve(null),
+    packagePath ? readJsonArtifact<DriftPayload>(packageDriftPath) : Promise.resolve(null)
   ]);
 
   const warnings: string[] = [];
-  if (!performance) warnings.push("Performance artifact missing; using fallback metrics.");
-  if (!drift) warnings.push("Drift artifact missing; using fallback drift summary.");
+  if (!performance && !packageMetrics) warnings.push("Performance artifact missing; using empty metrics.");
+  if (!drift && !packageDrift) warnings.push("Drift artifact missing; using empty drift summary.");
   if (!retrain) warnings.push("Retrain artifact missing; using fallback retrain decision.");
 
-  const overall = performance?.metrics?.overall ?? {};
-  const perSegment = performance?.metrics?.per_segment ?? {};
+  const metricsPayload = performance ?? packageMetrics;
+  const driftPayload = drift ?? packageDrift;
+  const overall = metricsPayload?.metrics?.overall ?? (packageMetrics as any)?.overall ?? {};
+  const perSegment = metricsPayload?.metrics?.per_segment ?? (packageMetrics as any)?.per_segment ?? {};
 
-  const sliceMetrics = Object.entries(perSegment).map(([segment, vals]) => ({
-    slice_key: segment,
-    n: Number(vals.n ?? 0),
-    ppe10: Number(vals.ppe10 ?? 0),
-    mdape: Number(vals.mdape ?? 0),
-    r2: Number(vals.r2 ?? 0)
-  }));
+  const sliceMetrics = Object.entries(perSegment).map(([segment, rawVals]) => {
+    const vals = rawVals as { n?: number; ppe10?: number; mdape?: number; r2?: number };
+    return {
+      slice_key: segment,
+      n: Number(vals.n ?? 0),
+      ppe10: Number(vals.ppe10 ?? 0),
+      mdape: Number(vals.mdape ?? 0),
+      r2: Number(vals.r2 ?? 0)
+    };
+  });
 
   return {
     payload: {
       window,
       drift_summary: {
-        status: drift?.status ?? "warn",
-        alerts: Number(drift?.alerts ?? 0),
-        warnings: Number(drift?.warnings ?? 0),
-        rows: Number(drift?.rows ?? 0),
-        reference_csv: drift?.reference_csv,
-        current_csv: drift?.current_csv
+        status: driftPayload?.status ?? "warn",
+        alerts: Number(driftPayload?.alerts ?? (packageMetrics as any)?.metadata?.feature_drift_alerts ?? 0),
+        warnings: Number(driftPayload?.warnings ?? (packageMetrics as any)?.metadata?.feature_drift_warnings ?? 0),
+        rows: Number(driftPayload?.rows ?? (packageMetrics as any)?.metadata?.feature_drift_rows ?? 0),
+        reference_csv: driftPayload?.reference_csv,
+        current_csv: driftPayload?.current_csv
       },
       performance_summary: {
-        status: performance?.status ?? "warn",
+        status: metricsPayload?.status ?? "package_metrics",
         overall: {
           n: Number(overall.n ?? 0),
           ppe10: Number(overall.ppe10 ?? 0),
@@ -123,7 +136,7 @@ export async function buildCanonicalMonitoringOverview(window: string): Promise<
       warnings
     },
     sourceContext: {
-      source_id: [perfPath, driftPath, retrainPath].join("|"),
+      source_id: [packageMetricsPath, packageDriftPath, perfPath, driftPath, retrainPath].join("|"),
       source_type: "other"
     }
   };
