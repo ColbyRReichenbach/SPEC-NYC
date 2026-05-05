@@ -78,19 +78,18 @@ Current blockers:
 
 - Raw and processed training data now exist locally but are intentionally gitignored due size. Reproducibility depends on rerunning connector + ETL, not committing the CSV.
 - Production data evidence now passes against the v2 ETL report.
-- No production-approved model package exists yet. The completed smoke challenger was correctly blocked because it missed configured absolute quality thresholds: minimum overall PPE10 and maximum overall MdAPE.
-- Local champion registry exists, but no champion alias is set for `spec-nyc-avm` until a candidate passes proposal gates and is approved.
+- No production-quality champion exists yet. Local scoring can use an approved alias or candidate fallback for demonstration, but the model evidence still does not justify a real production AVM claim.
+- Local champion registry exists, but champion approval should remain blocked for candidates that miss configured AVM quality thresholds.
 - `npm install` reports 17 dependency vulnerabilities, including a Next.js security warning; dependency upgrade work is still needed.
-- The new frontend intentionally blocks price generation until an approved model package and scoring bridge exist.
 - DS modeling audit is now documented in `docs/AVM_DS_MODELING_AUDIT.md`; the next implementation work should follow that audit before any champion/scoring work.
 
 Not completed in this pass:
 
 - DS model rebuilding has a clean v2 baseline, but it is not production quality: latest completed challenger PPE10 is 18.5% and MdAPE is 31.0% on the holdout. This is acceptable as a governed baseline, not as a deployable AVM.
-- Frontend model-backed valuation is not complete because there is no approved model package or serving bridge to call.
+- Frontend model-backed valuation now has a local serving bridge, but confidence, abstention, and calibration are still first-pass artifacts rather than production-grade valuation controls.
 - Experiment training is now routeable through a queued job manifest and local worker. A real worker smoke run completed for `exp_20260505T013702_0e9d360f`, producing challenger package `models/packages/spec_nyc_avm_v2_20260505T013717Z_b6538c8`, non-empty stdout/stderr logs, and a passed same-dataset comparison report. Additional queued jobs can be started from the dashboard or with `python3 -m src.experiments.worker --repo-root . --experiment-id <id> --once`.
 - Dataset snapshots are locked by package data hash and split signature. Row-level split ID materialization is still a future enhancement before this can fully guarantee row-by-row challenger/champion parity outside the current artifact contract.
-- Release approval workflow is implemented for local champion aliasing. Promotion to a serving/scoring runtime is still not complete; the next step is to make the scorer load only `models/packages/aliases/spec-nyc-avm.json`.
+- Release approval workflow is implemented for local champion aliasing. The scorer now resolves model packages through governed aliases/fallbacks, but release policy still needs real authz and durable registries.
 
 Completed on 2026-05-05:
 
@@ -124,6 +123,34 @@ Completed on 2026-05-05:
 - Added a frontend EDA & Hypothesis Lab at `/eda` that reads `reports/eda/*`, shows DS findings, and can convert an EDA backlog item into a locked experiment preflight through `/api/v1/experiments/preflight`.
 - Added a dynamic `/artifact-viewer` route and EDA artifact index so notebooks, reports, CSVs, JSON, and HTML artifacts generated after new EDA runs can be opened in-app from backend-discovered paths.
 - Added Playwright coverage for the EDA lab across desktop/mobile, including sidebar collapse behavior, failed-response/console-error checks, hypothesis preflight creation, and page-level horizontal overflow checks.
+
+Completed later on 2026-05-05:
+
+- Added the fully dynamic platform gap checklist at `docs/AVM_FULLY_DYNAMIC_PLATFORM_TODO.md`.
+- Added `config/platform_options.json` so model aliases, boroughs, model families, validation plans, metrics, and local review identities are config-backed instead of hardcoded in React.
+- Added canonical package resolution through `web/src/features/platform/packageResolver.ts`.
+- Added a Python serving bridge at `src/serving/score_single.py` that loads selected model packages, constructs inference-safe feature vectors, computes strict as-of H3 and comps features, runs `model.joblib`, and returns model-backed drivers.
+- Wired `/api/v1/valuations/single` to the serving bridge and persisted valuation request/response artifacts under `reports/valuations/`.
+- Replaced property explanations with persisted valuation explanations instead of fixed sample drivers.
+- Replaced global SHAP summary fallback with model/package-derived importance.
+- Added filesystem-backed batch valuation jobs using the same model-backed single-property scorer.
+- Updated governance, monitoring, property catalog, batch page, Copilot page, valuation workbench, experiment lab, and release-governance UI to read backend contracts/config/artifacts instead of fixed frontend state.
+- Added targeted dynamic-platform contract coverage at `web/tests/contracts/dynamic-platform.test.ts`.
+- Verified the pushed state with:
+  - `npm run typecheck`
+  - `npm run lint`
+  - `npm run test:contracts`
+  - `npm run test:e2e`
+
+Next DS/comps phase:
+
+- Keep the existing as-of comps engine as the v1 base; do not restart it from scratch.
+- Tune comps thresholds using holdout evidence and slice diagnostics rather than fixed intuition.
+- Add top-comp display to the valuation output, not only package artifact explorer.
+- Add confidence decomposition from comp count, comp dispersion, comp recency, feature completeness, and residual calibration.
+- Add log-target and log-PPSF target modes and compare them on identical locked rows/folds.
+- Add rolling-origin validation and slice gates before any champion promotion.
+- Add public-data enrichment starting with PLUTO/DOB fields that materially improve property condition, size, zoning, and alteration signal.
 
 ## Phase Order
 
@@ -610,21 +637,21 @@ Source audit: `docs/AVM_DS_MODELING_AUDIT.md`.
 ### Frontend P0: Model-Backed Valuation
 
 - [x] Replace hard-coded borough PPSF valuation logic in the visible product experience with governed no-score behavior.
-- [ ] Add backend scorer endpoint or service bridge.
+- [x] Add backend scorer endpoint or service bridge.
 - [ ] Return real model response:
-  - [ ] valuation ID
+  - [x] valuation ID
   - [ ] model package ID
-  - [ ] model alias
-  - [ ] model version
-  - [ ] route
+  - [x] model alias
+  - [x] model version
+  - [x] route
   - [ ] feature contract version
-  - [ ] predicted value
-  - [ ] interval
-  - [ ] confidence score
+  - [x] predicted value
+  - [x] interval
+  - [x] confidence score
   - [ ] hit/no-hit status
   - [ ] abstention reason
-  - [ ] evidence links
-- [x] Keep heuristic mode only as explicit degraded fallback.
+  - [x] evidence links
+- [x] Remove visible heuristic valuation mode from the main scoring path.
 - [x] Add UI badge for `model-backed` vs `fallback`.
 
 ### Frontend P0: Artifact Transparency
@@ -644,8 +671,8 @@ Source audit: `docs/AVM_DS_MODELING_AUDIT.md`.
 
 ### Frontend P1: Explainability UX
 
-- [ ] Replace hard-coded SHAP summary with generated SHAP JSON/CSV.
-- [ ] Add local driver waterfall from actual inference explanation.
+- [x] Replace hard-coded SHAP summary with generated model/package-derived importance.
+- [x] Add local drivers from actual inference explanation.
 - [x] Add package-level comparable-sales evidence panel in the artifact explorer.
 - [ ] Add top comparable sales table.
 - [ ] Add comps on map.
