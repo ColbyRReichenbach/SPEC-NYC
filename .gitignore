@@ -103,6 +103,7 @@ mlartifacts/
 htmlcov/
 .tox/
 .nox/
+web/test-results/
 !tests/
 !tests/**/*.py
 
@@ -144,6 +145,13 @@ reports/demo/stakeholder_demo_snapshot_latest.json
 reports/demo/stakeholder_demo_snapshot_latest.md
 reports/validation/demo_smoke_readiness_latest.json
 reports/validation/demo_smoke_readiness_latest.md
+
+# ----- Local Governed Platform Runtime Artifacts -----
+# Stable curated evidence can still be tracked with `git add -f` when needed.
+reports/valuations/
+reports/experiments/exp_20*.json
+reports/experiments/runs/exp_20*/
+reports/governance/proposals/proposal_20*/
 
 # ----- Local Arena/ETL Run Outputs (timestamped) -----
 reports/arena/run_card_*.md
