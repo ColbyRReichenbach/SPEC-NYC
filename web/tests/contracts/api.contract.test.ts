@@ -301,7 +301,19 @@ describe("governance safety + copilot fallback", () => {
         expires_at_utc: new Date(Date.now() + 3600_000).toISOString(),
         champion: { model_version: "1", run_id: "champ_run" },
         winner: null,
-        candidates_ranked: []
+        candidates_ranked: [
+          {
+            run_id: "exp_123",
+            model_version: "6",
+            gate_pass: false,
+            weighted_segment_mdape_improvement: 0.012,
+            overall_ppe10_lift: 0.03,
+            max_major_segment_ppe10_drop: 0,
+            min_major_segment_ppe10: 0.61,
+            drift_alert_delta: null,
+            fairness_alert_delta: null
+          }
+        ]
       },
       gate_results: [],
       status_reason: "Latest proposal status is 'no_winner'. Governance actions remain read-only in no-auth mode.",
