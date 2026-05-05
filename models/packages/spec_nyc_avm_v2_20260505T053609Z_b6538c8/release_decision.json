@@ -1,0 +1,21 @@
+{
+  "approver": "not_approved",
+  "artifact_hashes_sha256": "pending_until_release_approval",
+  "candidate_package_id": "spec_nyc_avm_v2_20260505T053609Z_b6538c8",
+  "decided_at_utc": "2026-05-05T05:36:12.848003Z",
+  "decision": "pending",
+  "gate_results": [
+    {
+      "gate": "candidate_generation",
+      "status": "pass"
+    },
+    {
+      "gate": "governance_approval",
+      "status": "pending"
+    }
+  ],
+  "previous_champion_package_id": "not_set",
+  "proposal_id": "proposal_spec_nyc_avm_v2_20260505T053609Z_b6538c8",
+  "reason": "candidate generated; governance approval not yet performed",
+  "rollback_package_id": "not_set"
+}

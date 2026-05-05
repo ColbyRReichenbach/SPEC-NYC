@@ -1,0 +1,55 @@
+{
+  "id": "exp_20260505T003446_2cbafece",
+  "created_at": "2026-05-05T00:34:46.743Z",
+  "status": "preflight_logged",
+  "manifest_path": "reports/experiments/exp_20260505T003446_2cbafece.json",
+  "hypothesis": {
+    "statement": "Train-fitted H3 price lag will reduce MdAPE for Brooklyn small multifamily properties.",
+    "expected_effect": "Lower MdAPE by 3-5% without worsening PPE10.",
+    "segment": "SMALL_MULTI",
+    "primary_metric": "MdAPE",
+    "risk_review_required": true
+  },
+  "run_plan": {
+    "model_family": "XGBoost segment specialist",
+    "validation_plan": "Time split + borough/segment slices",
+    "trial_budget": 12,
+    "baseline_package_id": "spec_nyc_avm_v2_20260504T235549Z_b6538c8",
+    "dataset_version": "nyc_open_data_2019_2024_v2_bootstrap",
+    "feature_contract_version": "fc_v2_20260504T235549Z_b6538c8"
+  },
+  "baseline_metrics": {
+    "ppe10": 0.1708691531848643,
+    "mdape": 0.31313148437500005,
+    "r2": 0.3138433722772701
+  },
+  "gates": [
+    {
+      "name": "data_snapshot_available",
+      "status": "pass",
+      "detail": "295,457 transformed rows available"
+    },
+    {
+      "name": "feature_contract_available",
+      "status": "pass",
+      "detail": "fc_v2_20260504T235549Z_b6538c8"
+    },
+    {
+      "name": "production_release_block",
+      "status": "pass",
+      "detail": "experiment is isolated from production because release gates are blocked"
+    }
+  ],
+  "production_blockers": [
+    {
+      "name": "production_model_evidence",
+      "status": "fail",
+      "detail": "model package contract failed: models/packages/spec_nyc_avm_v2_20260504T235549Z_b6538c8 - [release_decision] release_decision.decision must be approved for production eligibility (release_decision.json)"
+    },
+    {
+      "name": "arena_governance_production",
+      "status": "fail",
+      "detail": "champion alias not set for spec-nyc-avm (Registered model alias champion not found.)"
+    }
+  ]
+}

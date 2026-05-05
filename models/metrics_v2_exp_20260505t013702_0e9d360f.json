@@ -1,0 +1,120 @@
+{
+  "overall": {
+    "n": 59092,
+    "ppe10": 0.18499966154470995,
+    "mdape": 0.3101718427874359,
+    "r2": 0.30495737087261154
+  },
+  "per_segment": {
+    "ELEVATOR": {
+      "n": 25783,
+      "ppe10": 0.11143001202342628,
+      "mdape": 0.5065337382445141,
+      "r2": 0.27798731220014894
+    },
+    "SINGLE_FAMILY": {
+      "n": 25148,
+      "ppe10": 0.27493240019087006,
+      "mdape": 0.19403174892072214,
+      "r2": 0.5636153644352383
+    },
+    "SMALL_MULTI": {
+      "n": 3018,
+      "ppe10": 0.13618290258449303,
+      "mdape": 0.4080673380228011,
+      "r2": 0.32359304462615013
+    },
+    "WALKUP": {
+      "n": 5143,
+      "ppe10": 0.1427182578261715,
+      "mdape": 0.3902247844827586,
+      "r2": 0.30156889378803287
+    }
+  },
+  "per_price_tier": {
+    "core": {
+      "n": 14512,
+      "ppe10": 0.22250551267916208,
+      "mdape": 0.2970678573764307,
+      "r2": -90.75096287873893
+    },
+    "entry": {
+      "n": 13024,
+      "ppe10": 0.10918304668304668,
+      "mdape": 0.5499028041158537,
+      "r2": -62.133514309117025
+    },
+    "luxury": {
+      "n": 16212,
+      "ppe10": 0.18270416975080186,
+      "mdape": 0.2800676618479979,
+      "r2": 0.28733530697911625
+    },
+    "premium": {
+      "n": 15344,
+      "ppe10": 0.21630604796663191,
+      "mdape": 0.24648955067920586,
+      "r2": -40.85252548595814
+    }
+  },
+  "metadata": {
+    "model_version": "v2",
+    "model_package_id": "spec_nyc_avm_v2_20260505T013717Z_b6538c8",
+    "artifact_tag": "exp_20260505t013702_0e9d360f",
+    "trained_at_utc": "2026-05-05T01:37:37.570574",
+    "train_rows": 236365,
+    "test_rows": 59092,
+    "dataset_version": "nyc_open_data_2019_2024_v2_bootstrap",
+    "feature_contract_version": "fc_v2_20260505T013717Z_b6538c8",
+    "target": "sale_price",
+    "target_transform": "none",
+    "model_strategy": "global",
+    "router_mode": "segment_only",
+    "router_columns": [],
+    "min_segment_rows": 2000,
+    "segment_model_count": 0,
+    "feature_columns": [
+      "gross_square_feet",
+      "year_built",
+      "building_age",
+      "residential_units",
+      "total_units",
+      "distance_to_center_km",
+      "h3_price_lag",
+      "days_since_2019_start",
+      "month_sin",
+      "month_cos",
+      "borough",
+      "building_class",
+      "property_segment",
+      "neighborhood",
+      "rate_regime_bucket"
+    ],
+    "optuna_trials": 1,
+    "best_params": {
+      "n_estimators": 586,
+      "max_depth": 5,
+      "learning_rate": 0.07539795522412307,
+      "min_child_weight": 3.063700793085241,
+      "subsample": 0.9773969945418438,
+      "colsample_bytree": 0.9305980491286577
+    },
+    "segment_ppe10_variance": 0.16350238816744378,
+    "segment_variance_flag_v2": true,
+    "price_tier_proxy_bins_version": null,
+    "feature_missingness_rows": 360,
+    "feature_drift_rows": 360,
+    "feature_drift_alerts": 96,
+    "feature_drift_warnings": 43,
+    "temporal_period_freq": "Q",
+    "temporal_period_count": 6,
+    "temporal_mdape_std": 0.013668972415758167,
+    "temporal_ppe10_std": 0.01095761088290401,
+    "temporal_ppe10_min": 0.17017504985597165,
+    "temporal_ppe10_max": 0.2028121005538986,
+    "temporal_mdape_min": 0.2946106589147287,
+    "temporal_mdape_max": 0.33458355704697984,
+    "temporal_mdape_last_minus_first": -0.006696201563864079,
+    "temporal_ppe10_last_minus_first": 0.017402151485125944
+  }
+}

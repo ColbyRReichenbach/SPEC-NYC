@@ -1,0 +1,28 @@
+{
+  "id": "exp_20260505T061918_3738684d",
+  "created_at": "2026-05-05T06:19:18.115Z",
+  "updated_at": "2026-05-05T06:19:18.115Z",
+  "status": "spec_locked_preflight",
+  "run_type": "governed_experiment_lifecycle",
+  "spec_locked": true,
+  "spec_hash": "97c6e29b62cb32743446055b6bad8239307c9c0fdb89b08d95018b5b80c234ae",
+  "lifecycle": [
+    "spec_locked",
+    "dataset_snapshot_bound",
+    "comparison_contract_created",
+    "awaiting_review_request"
+  ],
+  "training_job": null,
+  "artifact_paths": {
+    "experiment_spec": "reports/experiments/runs/exp_20260505T061918_3738684d/experiment_spec.json",
+    "dataset_snapshot": "reports/experiments/runs/exp_20260505T061918_3738684d/dataset_snapshot.json",
+    "run_manifest": "reports/experiments/runs/exp_20260505T061918_3738684d/run_manifest.json",
+    "comparison_report": "reports/experiments/runs/exp_20260505T061918_3738684d/comparison_report.json",
+    "audit_log": "reports/experiments/runs/exp_20260505T061918_3738684d/audit_log.jsonl",
+    "review_request": "reports/experiments/runs/exp_20260505T061918_3738684d/review_request.json",
+    "review_decision": "reports/experiments/runs/exp_20260505T061918_3738684d/review_decision.json",
+    "job_manifest": "reports/experiments/runs/exp_20260505T061918_3738684d/job_manifest.json",
+    "training_stdout": "reports/experiments/runs/exp_20260505T061918_3738684d/training_stdout.log",
+    "training_stderr": "reports/experiments/runs/exp_20260505T061918_3738684d/training_stderr.log"
+  }
+}

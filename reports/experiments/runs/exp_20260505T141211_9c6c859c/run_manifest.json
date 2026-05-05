@@ -1,0 +1,88 @@
+{
+  "id": "exp_20260505T141211_9c6c859c",
+  "created_at": "2026-05-05T14:12:11.986Z",
+  "updated_at": "2026-05-05T14:12:13.860Z",
+  "status": "queued",
+  "run_type": "governed_experiment_lifecycle",
+  "spec_locked": true,
+  "spec_hash": "47b43464352a9aa2a42a808bd485a5dcf9ac3d9b06c9d3c56518d950a8a5bb31",
+  "lifecycle": [
+    "spec_locked",
+    "dataset_snapshot_bound",
+    "comparison_contract_created",
+    "awaiting_review_request",
+    "review_requested",
+    "review_approved",
+    "training_job_queued"
+  ],
+  "training_job": {
+    "id": "job_exp_20260505T141211_9c6c859c",
+    "experiment_id": "exp_20260505T141211_9c6c859c",
+    "status": "queued",
+    "queued_at": "2026-05-05T14:12:13.860Z",
+    "queued_by": "local_dashboard_user",
+    "reason": "Approved experiment queued from dashboard.",
+    "worker_module": "src.experiments.worker",
+    "execution_mode": "repo_worker_subprocess",
+    "command": [
+      "python3",
+      "-m",
+      "src.model",
+      "--input-csv",
+      "reports/model/comps_smoke_training_fixture.csv",
+      "--model-version",
+      "v2",
+      "--artifact-tag",
+      "exp_20260505T141211_9c6c859c",
+      "--dataset-version",
+      "rows_96_date_2020-01-01_2025-03-15",
+      "--optuna-trials",
+      "12",
+      "--shap-sample-size",
+      "250",
+      "--no-mlflow",
+      "--strategy",
+      "segmented_router",
+      "--router-mode",
+      "segment_only",
+      "--min-segment-rows",
+      "2000"
+    ],
+    "command_display": "python3 -m src.model --input-csv reports/model/comps_smoke_training_fixture.csv --model-version v2 --artifact-tag exp_20260505T141211_9c6c859c --dataset-version rows_96_date_2020-01-01_2025-03-15 --optuna-trials 12 --shap-sample-size 250 --no-mlflow --strategy segmented_router --router-mode segment_only --min-segment-rows 2000",
+    "cwd": ".",
+    "logs": {
+      "stdout": "reports/experiments/runs/exp_20260505T141211_9c6c859c/training_stdout.log",
+      "stderr": "reports/experiments/runs/exp_20260505T141211_9c6c859c/training_stderr.log"
+    },
+    "training_plan": {
+      "model_family": "XGBoost segment specialist",
+      "trainer_strategy": "segmented_router",
+      "router_mode": "segment_only",
+      "optuna_trials": 12,
+      "shap_sample_size": 250,
+      "dataset_version": "rows_96_date_2020-01-01_2025-03-15",
+      "artifact_tag": "exp_20260505T141211_9c6c859c"
+    },
+    "input_dataset": {
+      "source_path": "reports/model/comps_smoke_training_fixture.csv",
+      "data_snapshot_sha256": "7ff428e90ac10e7cd66dd662c5e86353f7ec5e4b30403fc8400982f1e7289af4",
+      "split_signature_sha256": "e4f7e99a11f0f7918ed5d5ecb6a3ed6b4b5b35cc0a5ccbf6a745898b69fc2b1c"
+    },
+    "output": {
+      "model_package_id": null,
+      "model_package_path": null
+    }
+  },
+  "artifact_paths": {
+    "experiment_spec": "reports/experiments/runs/exp_20260505T141211_9c6c859c/experiment_spec.json",
+    "dataset_snapshot": "reports/experiments/runs/exp_20260505T141211_9c6c859c/dataset_snapshot.json",
+    "run_manifest": "reports/experiments/runs/exp_20260505T141211_9c6c859c/run_manifest.json",
+    "comparison_report": "reports/experiments/runs/exp_20260505T141211_9c6c859c/comparison_report.json",
+    "audit_log": "reports/experiments/runs/exp_20260505T141211_9c6c859c/audit_log.jsonl",
+    "review_request": "reports/experiments/runs/exp_20260505T141211_9c6c859c/review_request.json",
+    "review_decision": "reports/experiments/runs/exp_20260505T141211_9c6c859c/review_decision.json",
+    "job_manifest": "reports/experiments/runs/exp_20260505T141211_9c6c859c/job_manifest.json",
+    "training_stdout": "reports/experiments/runs/exp_20260505T141211_9c6c859c/training_stdout.log",
+    "training_stderr": "reports/experiments/runs/exp_20260505T141211_9c6c859c/training_stderr.log"
+  }
+}

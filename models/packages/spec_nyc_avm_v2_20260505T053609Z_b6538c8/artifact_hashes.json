@@ -1,0 +1,17 @@
+{
+  "algorithm": "sha256",
+  "files": {
+    "data_manifest.json": "64708a4cc4bb0134024273a9b6c71a2fedce1be3c164b75c4b124f92082a6299",
+    "drift_report.json": "77e4855f0ba49bec012c6a82fe74d89f6ed753ac6c18f0b0b4a40c17ac32eb21",
+    "explainability_manifest.json": "dc2e935e8c49a5d13084b48e99b8498b393a7bcfc8c0cf7407d522ba6df79514",
+    "feature_contract.json": "be4ddd625a502613ff63b930374ba71d0c1e2c871b07ee2f26cc6a8ff62a1f37",
+    "metrics.json": "d87633f9cb35c5b63512214e7cbbc848fa1696df622285cd9cb20b1644c70669",
+    "model.joblib": "c83f461c6c5f2e3530da0242f1accc2e44ee825ec0bb86dbfb4a6fa970d1dbe3",
+    "model_card.md": "f36713e7780d60fbaeead5fbcb25015fc366176ca25d24e534aee3f58ff17d94",
+    "release_decision.json": "18398ff35b3d8228ce2a57495a826849acc68f5f6af3d4b80a41f4e8491505d4",
+    "slice_scorecard.csv": "a6933000ceea82a64a0b84e389590853319653c76d5a3e1297881d29b5ef7872",
+    "temporal_scorecard.csv": "6ccc926dd06b582283fe65dc36acf42ba9e9d0ff49fe0388c4e8d7e19b0c5d1a",
+    "training_manifest.json": "5b6c2cb45087b52cc95e6734cd10de74aedc6fbfcaef380e4189f185928a2480",
+    "validation_report.json": "b34cbb1ae9fbcf8933bfae1cad516039b1bc7591b569e5f8f05f7e2f3c59ea21"
+  }
+}

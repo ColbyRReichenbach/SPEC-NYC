@@ -1,0 +1,35 @@
+{
+  "id": "exp_20260505T133659_47fea8f9",
+  "created_at": "2026-05-05T13:36:59.162Z",
+  "locked_at": "2026-05-05T13:36:59.162Z",
+  "locked": true,
+  "hypothesis": {
+    "statement": "Playwright locked spec should create auditable artifacts 1777988218880.",
+    "expected_effect": "Lower MdAPE by 3-5% without worsening PPE10.",
+    "segment": "SMALL_MULTI",
+    "primary_metric": "MdAPE",
+    "risk_review_required": true
+  },
+  "controls": {
+    "baseline_package_id": "spec_nyc_avm_v2_20260505T053609Z_b6538c8",
+    "challenger_package_id": null,
+    "dataset_version": "rows_96_date_2020-01-01_2025-03-15",
+    "feature_contract_version": "fc_v2_20260505T053609Z_b6538c8",
+    "dataset_snapshot_sha256": "7ff428e90ac10e7cd66dd662c5e86353f7ec5e4b30403fc8400982f1e7289af4",
+    "split_signature_sha256": "e4f7e99a11f0f7918ed5d5ecb6a3ed6b4b5b35cc0a5ccbf6a745898b69fc2b1c",
+    "split_policy": "time_ordered_split",
+    "row_selection_policy": "champion_and_challenger_must_score_identical_dataset_snapshot_and_split_signature",
+    "promotion_policy": "requires_comparison_report_and_governance_approval"
+  },
+  "model_spec": {
+    "model_family": "XGBoost segment specialist",
+    "validation_plan": "Time split + borough/segment slices",
+    "trial_budget": 12,
+    "primary_metric": "MdAPE"
+  },
+  "audit": {
+    "created_by": "local_dashboard_user",
+    "source": "dashboard_experiment_preflight"
+  },
+  "spec_hash": "9daea2f82ab682d47d99974f5054d7ffd406ad45645c6e525b4898afe09f4f7b"
+}

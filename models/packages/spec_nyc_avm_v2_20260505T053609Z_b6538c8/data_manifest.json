@@ -1,0 +1,26 @@
+{
+  "created_at_utc": "2026-05-05T05:36:12.848003Z",
+  "data_freshness": {
+    "max_sale_date": "2025-03-15"
+  },
+  "data_snapshot_sha256": "7ff428e90ac10e7cd66dd662c5e86353f7ec5e4b30403fc8400982f1e7289af4",
+  "dataset_version": "rows_96_date_2020-01-01_2025-03-15",
+  "known_limitations": [
+    "Candidate package generated from available project data only.",
+    "Not approved for production use until release_decision.decision is updated by governance workflow.",
+    "Public NYC data may omit condition, renovation quality, listing media, concessions, and private transaction context."
+  ],
+  "max_sale_date": "2025-03-15",
+  "min_sale_date": "2020-01-01",
+  "post_filter_row_count": 96,
+  "raw_row_count": 96,
+  "schema_hash": "4ad6780ecbc1db51a851a634d3827827213a843eb81cbd442d34cddf8da170b5",
+  "sources": [
+    {
+      "extracted_at_utc": "2026-05-05T05:36:09.180338Z",
+      "name": "training_source",
+      "row_count": 96,
+      "uri": "reports/model/comps_smoke_training_fixture.csv"
+    }
+  ]
+}

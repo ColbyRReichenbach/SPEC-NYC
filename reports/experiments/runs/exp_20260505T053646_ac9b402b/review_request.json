@@ -1,0 +1,14 @@
+{
+  "experiment_id": "exp_20260505T053646_ac9b402b",
+  "requested_at": "2026-05-05T05:36:47.855Z",
+  "requested_by": "local_dashboard_user",
+  "reason": "Spec is ready for human review.",
+  "spec_hash": "738b196ee373b89e1f0484cc6f97d58943550e78d721a9ea5653e687869418e2",
+  "required_risk_review": true,
+  "checklist": [
+    "Hypothesis is logged before training.",
+    "Dataset snapshot and split signature are locked.",
+    "Champion/challenger comparisons require identical row contracts.",
+    "Promotion remains blocked until comparison and governance approval."
+  ]
+}

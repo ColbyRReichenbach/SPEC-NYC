@@ -1,0 +1,22 @@
+{
+  "id": "exp_20260505T005847_503c2a36",
+  "created_at": "2026-05-05T00:58:47.492Z",
+  "status": "spec_locked_preflight",
+  "run_type": "preflight_only",
+  "spec_locked": true,
+  "spec_hash": "b81163231799b63a258931867ba21d5c5e1bb3779d04b8e2a2ca503bb289d9f2",
+  "lifecycle": [
+    "spec_locked",
+    "dataset_snapshot_bound",
+    "comparison_contract_created",
+    "awaiting_training_job"
+  ],
+  "training_job": null,
+  "artifact_paths": {
+    "experiment_spec": "reports/experiments/runs/exp_20260505T005847_503c2a36/experiment_spec.json",
+    "dataset_snapshot": "reports/experiments/runs/exp_20260505T005847_503c2a36/dataset_snapshot.json",
+    "run_manifest": "reports/experiments/runs/exp_20260505T005847_503c2a36/run_manifest.json",
+    "comparison_report": "reports/experiments/runs/exp_20260505T005847_503c2a36/comparison_report.json",
+    "audit_log": "reports/experiments/runs/exp_20260505T005847_503c2a36/audit_log.jsonl"
+  }
+}

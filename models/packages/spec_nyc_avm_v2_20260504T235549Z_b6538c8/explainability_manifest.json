@@ -1,0 +1,13 @@
+{
+  "feature_importance_artifact": "reports/model/shap_summary_v2_clean_baseline.png",
+  "global_explainability_artifacts": [
+    "reports/model/shap_summary_v2_clean_baseline.png",
+    "reports/model/shap_waterfall_v2_clean_baseline.png"
+  ],
+  "limitations": [
+    "SHAP values explain model mechanics, not causal effects.",
+    "Local explanations are conditional on available public-data features."
+  ],
+  "local_explainability_method": "shap_waterfall",
+  "model_package_id": "spec_nyc_avm_v2_20260504T235549Z_b6538c8"
+}

@@ -1,0 +1,174 @@
+{
+  "blocked_target_derived_fields": [
+    "sale_price",
+    "price_tier",
+    "price_per_sqft",
+    "price_change_pct",
+    "previous_sale_price",
+    "previous_sale_date",
+    "days_since_last_sale",
+    "is_latest_sale"
+  ],
+  "feature_availability": {
+    "feature_count": 17,
+    "features": {
+      "borough": {
+        "as_of_policy": "covered by model feature contract and forbidden target-derived allowlist",
+        "source": "inference_available_public_or_derived_field"
+      },
+      "building_age": {
+        "as_of_policy": "Set missing when year_built was ETL-imputed; train-fit imputation handles fallback.",
+        "source": "derived_from_year_built_and_valuation_date"
+      },
+      "building_class": {
+        "as_of_policy": "covered by model feature contract and forbidden target-derived allowlist",
+        "source": "inference_available_public_or_derived_field"
+      },
+      "days_since_2019_start": {
+        "as_of_policy": "covered by model feature contract and forbidden target-derived allowlist",
+        "source": "inference_available_public_or_derived_field"
+      },
+      "distance_to_center_km": {
+        "as_of_policy": "covered by model feature contract and forbidden target-derived allowlist",
+        "source": "inference_available_public_or_derived_field"
+      },
+      "gross_square_feet": {
+        "as_of_policy": "ETL-imputed values are reset to missing before model fitting; imputation is train-fit only.",
+        "source": "public_record_or_train_fit_imputation"
+      },
+      "h3_prior_median_ppsf": {
+        "as_of_policy": "Uses same-H3 historical PPSF strictly before the row sale/valuation date.",
+        "source": "historical_public_sales"
+      },
+      "h3_prior_median_price": {
+        "as_of_policy": "Uses same-H3 sale prices strictly before the row sale/valuation date; never current/future target.",
+        "source": "historical_public_sales"
+      },
+      "h3_prior_sale_count": {
+        "as_of_policy": "Uses same-H3 sales strictly before the row sale/valuation date.",
+        "source": "historical_public_sales"
+      },
+      "month_cos": {
+        "as_of_policy": "covered by model feature contract and forbidden target-derived allowlist",
+        "source": "inference_available_public_or_derived_field"
+      },
+      "month_sin": {
+        "as_of_policy": "covered by model feature contract and forbidden target-derived allowlist",
+        "source": "inference_available_public_or_derived_field"
+      },
+      "neighborhood": {
+        "as_of_policy": "covered by model feature contract and forbidden target-derived allowlist",
+        "source": "inference_available_public_or_derived_field"
+      },
+      "property_segment": {
+        "as_of_policy": "covered by model feature contract and forbidden target-derived allowlist",
+        "source": "inference_available_public_or_derived_field"
+      },
+      "rate_regime_bucket": {
+        "as_of_policy": "covered by model feature contract and forbidden target-derived allowlist",
+        "source": "inference_available_public_or_derived_field"
+      },
+      "residential_units": {
+        "as_of_policy": "covered by model feature contract and forbidden target-derived allowlist",
+        "source": "inference_available_public_or_derived_field"
+      },
+      "total_units": {
+        "as_of_policy": "covered by model feature contract and forbidden target-derived allowlist",
+        "source": "inference_available_public_or_derived_field"
+      },
+      "year_built": {
+        "as_of_policy": "ETL-imputed values are reset to missing before model fitting; imputation is train-fit only.",
+        "source": "public_record_or_train_fit_imputation"
+      }
+    }
+  },
+  "local_market_features": {
+    "as_of_policy": "strictly_less_than_row_sale_date",
+    "feature_names": [
+      "h3_prior_sale_count",
+      "h3_prior_median_price",
+      "h3_prior_median_ppsf"
+    ],
+    "min_h3_prior_count_for_h3_median": 3,
+    "reference_policy": {
+      "test_rows": "training split rows only; holdout targets are never used",
+      "train_rows": "expanding historical rows from the training split only"
+    },
+    "test_missing_rates": {
+      "h3_prior_median_ppsf": 0.0,
+      "h3_prior_median_price": 0.0,
+      "h3_prior_sale_count": 0.0
+    },
+    "train_missing_rates": {
+      "h3_prior_median_ppsf": 0.017857142857142856,
+      "h3_prior_median_price": 0.017857142857142856,
+      "h3_prior_sale_count": 0.0
+    }
+  },
+  "model_critical_imputation": {
+    "test": {
+      "fields": {
+        "building_age": {
+          "policy": "reset_when_year_built_missing_after_etl_imputation_neutralization",
+          "reset_to_missing_rows": 1
+        },
+        "gross_square_feet": {
+          "etl_imputed_rows": 2,
+          "flag_column": "sqft_imputed",
+          "original_missing_or_invalid_rows": 0,
+          "reset_to_missing_rows": 2
+        },
+        "year_built": {
+          "etl_imputed_rows": 1,
+          "flag_column": "year_built_imputed",
+          "original_missing_or_invalid_rows": 0,
+          "reset_to_missing_rows": 1
+        }
+      },
+      "policy": "reset_etl_imputed_model_critical_values_to_missing"
+    },
+    "train": {
+      "fields": {
+        "building_age": {
+          "policy": "reset_when_year_built_missing_after_etl_imputation_neutralization",
+          "reset_to_missing_rows": 4
+        },
+        "gross_square_feet": {
+          "etl_imputed_rows": 7,
+          "flag_column": "sqft_imputed",
+          "original_missing_or_invalid_rows": 0,
+          "reset_to_missing_rows": 7
+        },
+        "year_built": {
+          "etl_imputed_rows": 4,
+          "flag_column": "year_built_imputed",
+          "original_missing_or_invalid_rows": 0,
+          "reset_to_missing_rows": 4
+        }
+      },
+      "policy": "reset_etl_imputed_model_critical_values_to_missing"
+    }
+  },
+  "model_package_id": "spec_nyc_avm_v2_20260505T045612Z_b6538c8",
+  "sale_validity": {
+    "reason_counts": {
+      "etl_sqft_imputed_review": 9,
+      "etl_year_built_imputed_review": 5,
+      "none": 127
+    },
+    "status_counts": {
+      "review": 13,
+      "valid_training_sale": 127
+    }
+  },
+  "split_manifest": {
+    "all_row_ids_sha256": "a9b947ff961ff6f4f33d096cca68482af64e3a8c0c455fbb543ee63013aee231",
+    "duplicate_row_ids": 0,
+    "row_count": 140,
+    "test_row_ids_sha256": "d147b9799c1b718981f77cf87ae7004d4e89ee14e8b6efff050f2734971fa5a3",
+    "test_rows": 28,
+    "train_row_ids_sha256": "c8d1a3230416ae74f7a71ed58043e47d0db9f18bdcae59bb1d491e80911e2623",
+    "train_rows": 112
+  },
+  "status": "pre_comps_ready"
+}

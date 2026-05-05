@@ -1,0 +1,289 @@
+{
+  "blocked_target_derived_fields": [
+    "sale_price",
+    "price_tier",
+    "price_per_sqft",
+    "price_change_pct",
+    "previous_sale_price",
+    "previous_sale_date",
+    "days_since_last_sale",
+    "is_latest_sale"
+  ],
+  "comparable_sales_features": {
+    "config": {
+      "fallback_max_age_days": 1825,
+      "max_age_diff_years": 50.0,
+      "max_candidate_pool_fallback": 600,
+      "max_candidate_pool_per_group": 300,
+      "max_distance_km": 3.0,
+      "max_sqft_ratio_diff": 0.75,
+      "max_unit_diff": 10.0,
+      "min_comps": 3,
+      "primary_max_age_days": 730,
+      "top_k": 8
+    },
+    "eligibility_policy": {
+      "as_of_rule": "comp.sale_date < valuation.sale_date",
+      "fallback_policy": "If primary filters produce fewer than min_comps, keep same-borough compatible-segment historical candidates up to fallback_max_age_days and rank with explicit distance/feature penalties.",
+      "primary_filters": [
+        "same borough",
+        "same or compatible property segment",
+        "within primary_max_age_days",
+        "within max_distance_km when coordinates are available",
+        "within max_sqft_ratio_diff when square footage is available",
+        "within max_age_diff_years when building age is available",
+        "within max_unit_diff when unit counts are available"
+      ],
+      "reference_policy": {
+        "test_rows": "training split rows only; holdout targets are never eligible comps",
+        "train_rows": "historical rows from the training split only"
+      },
+      "required_sale_validity_status": "valid_training_sale"
+    },
+    "feature_names": [
+      "comp_count",
+      "comp_median_price",
+      "comp_median_ppsf",
+      "comp_weighted_estimate",
+      "comp_price_dispersion",
+      "comp_nearest_distance_km",
+      "comp_median_recency_days",
+      "comp_local_momentum"
+    ],
+    "selected_comps_rows": 84,
+    "selected_comps_schema_version": 1,
+    "test": {
+      "comp_count": {
+        "max": 6.0,
+        "median": 4.0,
+        "min": 3.0,
+        "no_comp_rate": 0.0,
+        "sparse_comp_rate": 0.0
+      },
+      "missing_rates": {
+        "comp_count": 0.0,
+        "comp_local_momentum": 0.15,
+        "comp_median_ppsf": 0.0,
+        "comp_median_price": 0.0,
+        "comp_median_recency_days": 0.0,
+        "comp_nearest_distance_km": 0.0,
+        "comp_price_dispersion": 0.0,
+        "comp_weighted_estimate": 0.0
+      },
+      "row_count": 20,
+      "selected_comps_rows": 84
+    },
+    "train": {
+      "comp_count": {
+        "max": 6.0,
+        "median": 5.0,
+        "min": 0.0,
+        "no_comp_rate": 0.039473684210526314,
+        "sparse_comp_rate": 0.11842105263157894
+      },
+      "missing_rates": {
+        "comp_count": 0.0,
+        "comp_local_momentum": 0.2631578947368421,
+        "comp_median_ppsf": 0.039473684210526314,
+        "comp_median_price": 0.039473684210526314,
+        "comp_median_recency_days": 0.039473684210526314,
+        "comp_nearest_distance_km": 0.039473684210526314,
+        "comp_price_dispersion": 0.07894736842105263,
+        "comp_weighted_estimate": 0.039473684210526314
+      },
+      "row_count": 76,
+      "selected_comps_rows": 0
+    }
+  },
+  "feature_availability": {
+    "feature_count": 25,
+    "features": {
+      "borough": {
+        "as_of_policy": "covered by model feature contract and forbidden target-derived allowlist",
+        "source": "inference_available_public_or_derived_field"
+      },
+      "building_age": {
+        "as_of_policy": "Set missing when year_built was ETL-imputed; train-fit imputation handles fallback.",
+        "source": "derived_from_year_built_and_valuation_date"
+      },
+      "building_class": {
+        "as_of_policy": "covered by model feature contract and forbidden target-derived allowlist",
+        "source": "inference_available_public_or_derived_field"
+      },
+      "comp_count": {
+        "as_of_policy": "Counts selected valid comparable sales strictly before the row sale/valuation date.",
+        "source": "as_of_comparable_sales_engine"
+      },
+      "comp_local_momentum": {
+        "as_of_policy": "Recent-vs-older selected comparable PPSF trend computed from historical comps only.",
+        "source": "as_of_comparable_sales_engine"
+      },
+      "comp_median_ppsf": {
+        "as_of_policy": "Median PPSF from selected valid comparable sales strictly before valuation.",
+        "source": "as_of_comparable_sales_engine"
+      },
+      "comp_median_price": {
+        "as_of_policy": "Median price from selected valid comparable sales strictly before valuation.",
+        "source": "as_of_comparable_sales_engine"
+      },
+      "comp_median_recency_days": {
+        "as_of_policy": "Median age in days of selected historical comparable sales.",
+        "source": "as_of_comparable_sales_engine"
+      },
+      "comp_nearest_distance_km": {
+        "as_of_policy": "Nearest selected historical comparable distance.",
+        "source": "as_of_comparable_sales_engine"
+      },
+      "comp_price_dispersion": {
+        "as_of_policy": "Dispersion of selected comparable prices/PPSF computed from historical comps only.",
+        "source": "as_of_comparable_sales_engine"
+      },
+      "comp_weighted_estimate": {
+        "as_of_policy": "Similarity-weighted estimate from selected valid comparable sales strictly before valuation.",
+        "source": "as_of_comparable_sales_engine"
+      },
+      "days_since_2019_start": {
+        "as_of_policy": "covered by model feature contract and forbidden target-derived allowlist",
+        "source": "inference_available_public_or_derived_field"
+      },
+      "distance_to_center_km": {
+        "as_of_policy": "covered by model feature contract and forbidden target-derived allowlist",
+        "source": "inference_available_public_or_derived_field"
+      },
+      "gross_square_feet": {
+        "as_of_policy": "ETL-imputed values are reset to missing before model fitting; imputation is train-fit only.",
+        "source": "public_record_or_train_fit_imputation"
+      },
+      "h3_prior_median_ppsf": {
+        "as_of_policy": "Uses same-H3 historical PPSF strictly before the row sale/valuation date.",
+        "source": "historical_public_sales"
+      },
+      "h3_prior_median_price": {
+        "as_of_policy": "Uses same-H3 sale prices strictly before the row sale/valuation date; never current/future target.",
+        "source": "historical_public_sales"
+      },
+      "h3_prior_sale_count": {
+        "as_of_policy": "Uses same-H3 sales strictly before the row sale/valuation date.",
+        "source": "historical_public_sales"
+      },
+      "month_cos": {
+        "as_of_policy": "covered by model feature contract and forbidden target-derived allowlist",
+        "source": "inference_available_public_or_derived_field"
+      },
+      "month_sin": {
+        "as_of_policy": "covered by model feature contract and forbidden target-derived allowlist",
+        "source": "inference_available_public_or_derived_field"
+      },
+      "neighborhood": {
+        "as_of_policy": "covered by model feature contract and forbidden target-derived allowlist",
+        "source": "inference_available_public_or_derived_field"
+      },
+      "property_segment": {
+        "as_of_policy": "covered by model feature contract and forbidden target-derived allowlist",
+        "source": "inference_available_public_or_derived_field"
+      },
+      "rate_regime_bucket": {
+        "as_of_policy": "covered by model feature contract and forbidden target-derived allowlist",
+        "source": "inference_available_public_or_derived_field"
+      },
+      "residential_units": {
+        "as_of_policy": "covered by model feature contract and forbidden target-derived allowlist",
+        "source": "inference_available_public_or_derived_field"
+      },
+      "total_units": {
+        "as_of_policy": "covered by model feature contract and forbidden target-derived allowlist",
+        "source": "inference_available_public_or_derived_field"
+      },
+      "year_built": {
+        "as_of_policy": "ETL-imputed values are reset to missing before model fitting; imputation is train-fit only.",
+        "source": "public_record_or_train_fit_imputation"
+      }
+    }
+  },
+  "local_market_features": {
+    "as_of_policy": "strictly_less_than_row_sale_date",
+    "feature_names": [
+      "h3_prior_sale_count",
+      "h3_prior_median_price",
+      "h3_prior_median_ppsf"
+    ],
+    "min_h3_prior_count_for_h3_median": 3,
+    "reference_policy": {
+      "test_rows": "training split rows only; holdout targets are never used",
+      "train_rows": "expanding historical rows from the training split only"
+    },
+    "test_missing_rates": {
+      "h3_prior_median_ppsf": 0.0,
+      "h3_prior_median_price": 0.0,
+      "h3_prior_sale_count": 0.0
+    },
+    "train_missing_rates": {
+      "h3_prior_median_ppsf": 0.013157894736842105,
+      "h3_prior_median_price": 0.013157894736842105,
+      "h3_prior_sale_count": 0.0
+    }
+  },
+  "model_critical_imputation": {
+    "test": {
+      "fields": {
+        "building_age": {
+          "policy": "reset_when_year_built_missing_after_etl_imputation_neutralization",
+          "reset_to_missing_rows": 0
+        },
+        "gross_square_feet": {
+          "etl_imputed_rows": 0,
+          "flag_column": "sqft_imputed",
+          "original_missing_or_invalid_rows": 0,
+          "reset_to_missing_rows": 0
+        },
+        "year_built": {
+          "etl_imputed_rows": 0,
+          "flag_column": "year_built_imputed",
+          "original_missing_or_invalid_rows": 0,
+          "reset_to_missing_rows": 0
+        }
+      },
+      "policy": "reset_etl_imputed_model_critical_values_to_missing"
+    },
+    "train": {
+      "fields": {
+        "building_age": {
+          "policy": "reset_when_year_built_missing_after_etl_imputation_neutralization",
+          "reset_to_missing_rows": 0
+        },
+        "gross_square_feet": {
+          "etl_imputed_rows": 0,
+          "flag_column": "sqft_imputed",
+          "original_missing_or_invalid_rows": 0,
+          "reset_to_missing_rows": 0
+        },
+        "year_built": {
+          "etl_imputed_rows": 0,
+          "flag_column": "year_built_imputed",
+          "original_missing_or_invalid_rows": 0,
+          "reset_to_missing_rows": 0
+        }
+      },
+      "policy": "reset_etl_imputed_model_critical_values_to_missing"
+    }
+  },
+  "model_package_id": "spec_nyc_avm_v2_20260505T052649Z_b6538c8",
+  "sale_validity": {
+    "reason_counts": {
+      "none": 96
+    },
+    "status_counts": {
+      "valid_training_sale": 96
+    }
+  },
+  "split_manifest": {
+    "all_row_ids_sha256": "5beafcd8964d788379bbc491a225220c16dd625f0230202c6220d0948b294c60",
+    "duplicate_row_ids": 0,
+    "row_count": 96,
+    "test_row_ids_sha256": "938e88e73942fe40d5b7d48796f74daa9929fe63d96d00a22e9ff40680d9b81f",
+    "test_rows": 20,
+    "train_row_ids_sha256": "5bc2e1bd13f2a554254bd9c6e9cbd8ee742d869b82e5a1e952b42b90861ec16e",
+    "train_rows": 76
+  },
+  "status": "pre_comps_ready"
+}

@@ -1,0 +1,26 @@
+{
+  "created_at_utc": "2026-05-04T23:56:07.559870Z",
+  "data_freshness": {
+    "max_sale_date": "2024-12-31"
+  },
+  "data_snapshot_sha256": "46cc7aa011b6fe11b2eadfe7645375fbb34121d7270d93be42671f40fa152b0e",
+  "dataset_version": "nyc_open_data_2019_2024_v2_bootstrap",
+  "known_limitations": [
+    "Candidate package generated from available project data only.",
+    "Not approved for production use until release_decision.decision is updated by governance workflow.",
+    "Public NYC data may omit condition, renovation quality, listing media, concessions, and private transaction context."
+  ],
+  "max_sale_date": "2024-12-31",
+  "min_sale_date": "2019-01-01",
+  "post_filter_row_count": 295457,
+  "raw_row_count": 295457,
+  "schema_hash": "185a905531981a0466573b6eefecb20d1e58f102eae2d4f4184fd922f0bc8ba9",
+  "sources": [
+    {
+      "extracted_at_utc": "2026-05-04T23:55:49.491780Z",
+      "name": "training_source",
+      "row_count": 295457,
+      "uri": "data/processed/nyc_sales_2019_2024_avm_training.csv"
+    }
+  ]
+}

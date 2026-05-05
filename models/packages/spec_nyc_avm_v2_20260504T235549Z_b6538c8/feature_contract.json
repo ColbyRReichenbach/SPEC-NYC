@@ -1,0 +1,156 @@
+{
+  "feature_contract_version": "fc_v2_20260504T235549Z_b6538c8",
+  "features": [
+    {
+      "description": "Building gross square footage available before valuation.",
+      "dtype": "float64",
+      "inference_available": true,
+      "name": "gross_square_feet",
+      "null_policy": "pipeline_imputation_or_reject",
+      "owner": "mlops",
+      "point_in_time_available": true,
+      "source": "training_feature_engineering"
+    },
+    {
+      "description": "Property construction year available before valuation.",
+      "dtype": "int64",
+      "inference_available": true,
+      "name": "year_built",
+      "null_policy": "pipeline_imputation_or_reject",
+      "owner": "mlops",
+      "point_in_time_available": true,
+      "source": "training_feature_engineering"
+    },
+    {
+      "description": "Age of the building at valuation time.",
+      "dtype": "int64",
+      "inference_available": true,
+      "name": "building_age",
+      "null_policy": "pipeline_imputation_or_reject",
+      "owner": "mlops",
+      "point_in_time_available": true,
+      "source": "training_feature_engineering"
+    },
+    {
+      "description": "Residential unit count.",
+      "dtype": "float64",
+      "inference_available": true,
+      "name": "residential_units",
+      "null_policy": "pipeline_imputation_or_reject",
+      "owner": "mlops",
+      "point_in_time_available": true,
+      "source": "training_feature_engineering"
+    },
+    {
+      "description": "Total unit count.",
+      "dtype": "float64",
+      "inference_available": true,
+      "name": "total_units",
+      "null_policy": "pipeline_imputation_or_reject",
+      "owner": "mlops",
+      "point_in_time_available": true,
+      "source": "training_feature_engineering"
+    },
+    {
+      "description": "Distance to configured city center proxy.",
+      "dtype": "float64",
+      "inference_available": true,
+      "name": "distance_to_center_km",
+      "null_policy": "pipeline_imputation_or_reject",
+      "owner": "mlops",
+      "point_in_time_available": true,
+      "source": "training_feature_engineering"
+    },
+    {
+      "description": "Training-window H3 local price lag fitted without validation leakage.",
+      "dtype": "float64",
+      "inference_available": true,
+      "name": "h3_price_lag",
+      "null_policy": "pipeline_imputation_or_reject",
+      "owner": "mlops",
+      "point_in_time_available": true,
+      "source": "training_feature_engineering"
+    },
+    {
+      "description": "Days elapsed since the temporal baseline date.",
+      "dtype": "float64",
+      "inference_available": true,
+      "name": "days_since_2019_start",
+      "null_policy": "pipeline_imputation_or_reject",
+      "owner": "mlops",
+      "point_in_time_available": true,
+      "source": "training_feature_engineering"
+    },
+    {
+      "description": "Cyclical month sine term derived from sale or valuation date.",
+      "dtype": "float64",
+      "inference_available": true,
+      "name": "month_sin",
+      "null_policy": "pipeline_imputation_or_reject",
+      "owner": "mlops",
+      "point_in_time_available": true,
+      "source": "training_feature_engineering"
+    },
+    {
+      "description": "Cyclical month cosine term derived from sale or valuation date.",
+      "dtype": "float64",
+      "inference_available": true,
+      "name": "month_cos",
+      "null_policy": "pipeline_imputation_or_reject",
+      "owner": "mlops",
+      "point_in_time_available": true,
+      "source": "training_feature_engineering"
+    },
+    {
+      "description": "NYC borough identifier.",
+      "dtype": "int64",
+      "inference_available": true,
+      "name": "borough",
+      "null_policy": "pipeline_imputation_or_reject",
+      "owner": "mlops",
+      "point_in_time_available": true,
+      "source": "training_feature_engineering"
+    },
+    {
+      "description": "NYC building class category.",
+      "dtype": "object",
+      "inference_available": true,
+      "name": "building_class",
+      "null_policy": "pipeline_imputation_or_reject",
+      "owner": "mlops",
+      "point_in_time_available": true,
+      "source": "training_feature_engineering"
+    },
+    {
+      "description": "Residential property segment used for slicing and optional routing.",
+      "dtype": "object",
+      "inference_available": true,
+      "name": "property_segment",
+      "null_policy": "pipeline_imputation_or_reject",
+      "owner": "mlops",
+      "point_in_time_available": true,
+      "source": "training_feature_engineering"
+    },
+    {
+      "description": "Neighborhood label.",
+      "dtype": "object",
+      "inference_available": true,
+      "name": "neighborhood",
+      "null_policy": "pipeline_imputation_or_reject",
+      "owner": "mlops",
+      "point_in_time_available": true,
+      "source": "training_feature_engineering"
+    },
+    {
+      "description": "Macro time-regime proxy derived from valuation date.",
+      "dtype": "object",
+      "inference_available": true,
+      "name": "rate_regime_bucket",
+      "null_policy": "pipeline_imputation_or_reject",
+      "owner": "mlops",
+      "point_in_time_available": true,
+      "source": "training_feature_engineering"
+    }
+  ],
+  "router_columns": []
+}

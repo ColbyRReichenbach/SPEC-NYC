@@ -1,31 +1,21 @@
 # S.P.E.C. NYC V1 Readiness Report
 
-- Mode: `smoke`
-- Started (UTC): `2026-02-24T00:22:41.224516`
-- Finished (UTC): `2026-02-24T00:23:38.984218`
-- Duration: `57.76s`
+- Mode: `production`
+- Started (UTC): `2026-05-05T00:03:14.711579`
+- Finished (UTC): `2026-05-05T00:03:34.260959`
+- Duration: `19.55s`
 
 ## Checks
 
 | Check | Evidence Type | Status | Detail | Log |
 |---|---|---|---|---|
-| unit_tests | smoke | pass | exit=0; OK | reports/validation/logs/unit_tests.log |
-| docker_compose_config | smoke | pass | exit=0; time="2026-02-23T19:22:46-05:00" level=warning msg="The \"OPENAI_API_KEY\" variable is not set. Defaulting to a blank string." | reports/validation/logs/docker_compose_config.log |
-| docker_compose_up_db | smoke | pass | exit=0;  Container spec_nyc_db  Started | reports/validation/logs/docker_compose_up_db.log |
-| db_connectivity | smoke | pass | exit=0; db_ok | reports/validation/logs/db_connectivity.log |
-| db_schema_create | smoke | pass | exit=0;   Base = declarative_base() | reports/validation/logs/db_schema_create.log |
-| canonicalization_smoke | smoke | pass | canonical contracts passed | - |
-| etl_smoke | smoke | pass | exit=0; 2026-02-23 19:22:52,963 - INFO - Wrote ETL CSV summary: reports/data/etl_run_20260224_w6_smoke.csv | reports/validation/logs/etl_smoke.log |
-| model_smoke | smoke | pass | exit=0; 2026-02-23 19:23:03,468 - INFO - Generated SHAP artifacts: {'summary_plot_path': 'reports/model/shap_summary_v1_smoke.png', 'waterfall_plot_path': 'reports/model/shap_waterfall_v1_smoke.png', 'sample_size': 120, 'explainer_type': 'xgboost_pred_contribs', 'explain_scope': 'global', 'model_strategy': 'global'} | reports/validation/logs/model_smoke.log |
-| evaluate_smoke | smoke | pass | exit=0; Overall => n=160, PPE10=0.519, MdAPE=0.095, R2=0.793 | reports/validation/logs/evaluate_smoke.log |
-| explain_smoke | smoke | pass | exit=0; 2026-02-23 19:23:13,591 - INFO - Saved SHAP waterfall plot: reports/model/shap_waterfall_v1_smoke.png | reports/validation/logs/explain_smoke.log |
-| mlflow_track_smoke | smoke | pass | exit=0; 2026/02/23 19:23:17 INFO alembic.runtime.migration: Will assume non-transactional DDL. | reports/validation/logs/mlflow_track_smoke.log |
-| drift_monitor_smoke | smoke | pass | exit=0; } | reports/validation/logs/drift_monitor_smoke.log |
-| performance_monitor_smoke | smoke | pass | exit=0; } | reports/validation/logs/performance_monitor_smoke.log |
-| retrain_policy_smoke | smoke | pass | exit=0; } | reports/validation/logs/retrain_policy_smoke.log |
-| streamlit_app_smoke | smoke | pass | app process stayed healthy for startup window | reports/validation/logs/streamlit_app_smoke.log |
-| artifact_inventory | smoke | pass | all required artifacts present | - |
-| docker_compose_stop_db | smoke | pass | exit=0;  Container spec_nyc_db  Stopped | reports/validation/logs/docker_compose_stop_db.log |
+| unit_tests | production | pass | exit=0; OK | reports/validation/logs/unit_tests.log |
+| production_data_evidence | production | pass | found 1 production ETL markdown + 1 csv reports | - |
+| production_model_evidence | production | fail | model package contract failed: models/packages/spec_nyc_avm_v2_20260504T235549Z_b6538c8 - [release_decision] release_decision.decision must be approved for production eligibility (release_decision.json) | - |
+| production_product_evidence | production | pass | all required artifacts present | - |
+| production_ops_evidence | production | pass | all required artifacts present | - |
+| streamlit_app_production | production | pass | app process stayed healthy for startup window | reports/validation/logs/streamlit_app_production.log |
+| arena_governance_production | production | fail | champion alias not set for spec-nyc-avm (Registered model alias champion not found.) | - |
 | release_tag | release | pass | tagging skipped (--tag-release not set) | - |
 
 ## Gates
@@ -33,10 +23,10 @@
 | Gate | Status | Failed Checks | Missing Checks |
 |---|---|---|---|
 | Gate A (Data) | done | - | - |
-| Gate B (Model) | done | - | - |
+| Gate B (Model) | blocked | production_model_evidence, arena_governance_production | - |
 | Gate C (Product) | done | - | - |
 | Gate D (Ops) | done | - | - |
-| Gate E (Release) | done | - | - |
+| Gate E (Release) | blocked | - | - |
 
 ## Artifacts
 

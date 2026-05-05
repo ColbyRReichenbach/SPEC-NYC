@@ -1,0 +1,13 @@
+{
+  "dataset_version": "rows_96_date_2020-01-01_2025-03-15",
+  "source_path": "memory://comps-smoke-fixture",
+  "raw_rows": 498666,
+  "transformed_rows": 295457,
+  "train_rows": 76,
+  "test_rows": 20,
+  "min_sale_date": "2020-01-01",
+  "max_sale_date": "2025-03-15",
+  "data_snapshot_sha256": "7ff428e90ac10e7cd66dd662c5e86353f7ec5e4b30403fc8400982f1e7289af4",
+  "split_signature_sha256": "e4f7e99a11f0f7918ed5d5ecb6a3ed6b4b5b35cc0a5ccbf6a745898b69fc2b1c",
+  "row_identity_note": "This run is locked to the package dataset snapshot hash and split signature. Row-level ID materialization is still a future enhancement."
+}

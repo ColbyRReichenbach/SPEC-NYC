@@ -1,0 +1,52 @@
+{
+  "cardinality": {
+    "borough": 5,
+    "building_class": 48,
+    "h3_index": 1047,
+    "neighborhood": 257,
+    "property_id": 256430,
+    "property_segment": 4
+  },
+  "column_count": 17,
+  "important_missingness": {
+    "borough": 0.0,
+    "building_age": 0.0,
+    "building_class": 0.0,
+    "distance_to_center_km": 0.0,
+    "gross_square_feet": 0.0,
+    "h3_index": 0.0,
+    "neighborhood": 0.0,
+    "price_per_sqft": 0.0,
+    "property_id": 0.0,
+    "property_segment": 0.0,
+    "residential_units": 0.2887357551183421,
+    "sale_date": 0.0,
+    "sale_price": 0.0,
+    "sqft_imputed": 0.0,
+    "total_units": 0.2887357551183421,
+    "year_built": 0.0,
+    "year_built_imputed": 0.0
+  },
+  "price_per_sqft": {
+    "max": 1100000.0,
+    "median": 470.532319391635,
+    "min": 0.0670977623343579,
+    "missing": 0.0,
+    "p25": 289.7135416666667,
+    "p75": 792.8571428571429
+  },
+  "row_count": 295457,
+  "sale_date_max": "2024-12-31",
+  "sale_date_min": "2019-01-01",
+  "sale_price": {
+    "max": 598155755.0,
+    "median": 775000.0,
+    "min": 10000.0,
+    "missing": 0.0,
+    "p25": 500000.0,
+    "p75": 1275000.0
+  },
+  "source_path": "data/processed/nyc_sales_2019_2024_avm_training.csv",
+  "sqft_imputed_rate": 0.5263507041633808,
+  "year_built_imputed_rate": 0.04433470860395929
+}

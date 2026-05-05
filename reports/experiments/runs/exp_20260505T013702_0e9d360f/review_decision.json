@@ -1,0 +1,26 @@
+{
+  "experiment_id": "exp_20260505T013702_0e9d360f",
+  "decided_at": "2026-05-05T01:37:03.543Z",
+  "decision": "approved",
+  "reviewer": "local_reviewer",
+  "reason": "Approved for controlled smoke worker verification.",
+  "previous_status": "review_requested",
+  "next_status": "review_approved",
+  "policy_checks": [
+    {
+      "name": "spec_hash_present",
+      "status": "pass",
+      "detail": "Locked hash 4964b4552e22"
+    },
+    {
+      "name": "dataset_bound",
+      "status": "pass",
+      "detail": "46cc7aa011b6fe11b2eadfe7645375fbb34121d7270d93be42671f40fa152b0e"
+    },
+    {
+      "name": "trainer_supported",
+      "status": "pass",
+      "detail": "Trainer adapter exists."
+    }
+  ]
+}

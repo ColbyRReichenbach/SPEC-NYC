@@ -1,0 +1,10 @@
+{
+  "feature_importance_artifact": "not_generated",
+  "global_explainability_artifacts": [],
+  "limitations": [
+    "SHAP values explain model mechanics, not causal effects.",
+    "Local explanations are conditional on available public-data features."
+  ],
+  "local_explainability_method": "not_generated",
+  "model_package_id": "spec_nyc_avm_v2_20260505T052649Z_b6538c8"
+}

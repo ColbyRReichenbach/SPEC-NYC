@@ -1,0 +1,102 @@
+{
+  "proposal_id": "proposal_20260505T141057_750b6369",
+  "experiment_id": "exp_20260505T013702_0e9d360f",
+  "created_at_utc": "2026-05-05T14:10:57.063Z",
+  "updated_at_utc": "2026-05-05T14:10:58.785Z",
+  "expires_at_utc": "2026-05-06T14:10:57.068Z",
+  "status": "rejected",
+  "registered_model_name": "spec-nyc-avm",
+  "proposal_dir": "reports/governance/proposals/proposal_20260505T141057_750b6369",
+  "artifact_paths": {
+    "release_proposal": "reports/governance/proposals/proposal_20260505T141057_750b6369/release_proposal.json",
+    "approval_decision": "reports/governance/proposals/proposal_20260505T141057_750b6369/approval_decision.json",
+    "audit_log": "reports/governance/proposals/proposal_20260505T141057_750b6369/audit_log.jsonl"
+  },
+  "candidate": {
+    "package_id": "spec_nyc_avm_v2_20260505T013717Z_b6538c8",
+    "package_path": "models/packages/spec_nyc_avm_v2_20260505T013717Z_b6538c8",
+    "metrics": {
+      "ppe10": 0.18499966154470995,
+      "mdape": 0.3101718427874359,
+      "r2": 0.30495737087261154
+    }
+  },
+  "champion": {
+    "package_id": "spec_nyc_avm_v2_20260504T235549Z_b6538c8",
+    "package_path": "models/packages/spec_nyc_avm_v2_20260504T235549Z_b6538c8",
+    "metrics": {
+      "ppe10": 0.1708691531848643,
+      "mdape": 0.31313148437500005,
+      "r2": 0.3138433722772701
+    }
+  },
+  "rollback": {
+    "package_id": "spec_nyc_avm_v2_20260504T235549Z_b6538c8",
+    "package_path": "models/packages/spec_nyc_avm_v2_20260504T235549Z_b6538c8"
+  },
+  "comparison": {
+    "status": "passed",
+    "comparison_report_path": "reports/experiments/runs/exp_20260505T013702_0e9d360f/comparison_report.json",
+    "same_dataset_contract": true,
+    "metric_deltas": {
+      "ppe10": 0.014130508359845667,
+      "mdape": -0.0029596415875641213,
+      "r2": -0.008886001404658561
+    }
+  },
+  "gate_results": [
+    {
+      "name": "experiment_completed",
+      "status": "pass",
+      "detail": "Experiment status is completed."
+    },
+    {
+      "name": "comparison_passed",
+      "status": "pass",
+      "detail": "Comparison status is passed."
+    },
+    {
+      "name": "same_dataset_contract",
+      "status": "pass",
+      "detail": "Champion and challenger comparison used the locked dataset contract."
+    },
+    {
+      "name": "candidate_package_exists",
+      "status": "pass",
+      "detail": "models/packages/spec_nyc_avm_v2_20260505T013717Z_b6538c8"
+    },
+    {
+      "name": "rollback_pointer_exists",
+      "status": "pass",
+      "detail": "Rollback target available at models/packages/spec_nyc_avm_v2_20260504T235549Z_b6538c8."
+    },
+    {
+      "name": "artifact_hash_manifest",
+      "status": "pass",
+      "detail": "models/packages/spec_nyc_avm_v2_20260505T013717Z_b6538c8/artifact_hashes.json"
+    },
+    {
+      "name": "min_overall_ppe10",
+      "status": "fail",
+      "detail": "Candidate PPE10 18.5% vs threshold 24%."
+    },
+    {
+      "name": "max_overall_mdape",
+      "status": "fail",
+      "detail": "Candidate MdAPE 31.02% vs threshold 30%."
+    }
+  ],
+  "source_artifacts": {
+    "experiment_spec": "reports/experiments/runs/exp_20260505T013702_0e9d360f/experiment_spec.json",
+    "run_manifest": "reports/experiments/runs/exp_20260505T013702_0e9d360f/run_manifest.json",
+    "job_manifest": "reports/experiments/runs/exp_20260505T013702_0e9d360f/job_manifest.json",
+    "comparison_report": "reports/experiments/runs/exp_20260505T013702_0e9d360f/comparison_report.json",
+    "model_package": "models/packages/spec_nyc_avm_v2_20260505T013717Z_b6538c8",
+    "artifact_hashes": "models/packages/spec_nyc_avm_v2_20260505T013717Z_b6538c8/artifact_hashes.json"
+  },
+  "decision": {
+    "decided_at_utc": "2026-05-05T14:10:58.785Z",
+    "decided_by": "local_release_owner",
+    "reason": "Rejected by Playwright governance QA."
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "row_count": 360,
+  "source_csv": "reports/model/feature_drift_segment_time_v2_clean_baseline.csv",
+  "status": "generated",
+  "status_counts": {
+    "alert": 96,
+    "ok": 221,
+    "warn": 43
+  }
+}

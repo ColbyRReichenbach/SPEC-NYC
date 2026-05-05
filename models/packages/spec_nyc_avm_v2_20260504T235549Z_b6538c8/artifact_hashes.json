@@ -1,0 +1,17 @@
+{
+  "algorithm": "sha256",
+  "files": {
+    "data_manifest.json": "1ef02f5336be8ddc2296220f21a36f6119482fbb58a0a17829b4b16006d1d6ad",
+    "drift_report.json": "ad7f4eabc51bb2bdf4d9255eeef04ec87beb3387bc6a7bd2353722b3f4d0e51c",
+    "explainability_manifest.json": "6e46374e07dbd370f60e000d8a25ee404b1e9b811e339edda9e5cd165c677197",
+    "feature_contract.json": "9de488718670ecdd709546f7d2fff82c42ee3e0f9a49dc25187be222af17a95d",
+    "metrics.json": "2cdf588bdbcc737773d1311b628955193727f3dbab8cad8a0e9b8199027b7cfd",
+    "model.joblib": "62d6c82af4582a25aaa177a92616380fd0574cf630797fcbf9ae3eada5ffd711",
+    "model_card.md": "702d2c2ac92b6d7223b169edfdab0d04a26523c92ee5c0f9088eef4a8ddef2f9",
+    "release_decision.json": "7482c52423ddaba968ba554e8ffe181d09bb999f0686fb80d65ef37bc0a5072d",
+    "slice_scorecard.csv": "ac859c1bf59611d8238c72ef54d5b446826d90ec4f745696675d79b961b9d348",
+    "temporal_scorecard.csv": "fa822d0337a8a5b7c4b2f0fb967a6479809a97276fdd0ad7a61dd36bc953d562",
+    "training_manifest.json": "7d8f9231f35ba36bfeb4821a1e03aa0f7a3c6903b5a84a7caaea767505946cfd",
+    "validation_report.json": "46734d5d695befedb5760b8bbc87102400f4e5a670983ef1ab87b38bd38874b8"
+  }
+}

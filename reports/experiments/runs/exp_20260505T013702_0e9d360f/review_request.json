@@ -1,0 +1,14 @@
+{
+  "experiment_id": "exp_20260505T013702_0e9d360f",
+  "requested_at": "2026-05-05T01:37:03.099Z",
+  "requested_by": "local_dashboard_user",
+  "reason": "Smoke worker verification review request.",
+  "spec_hash": "4964b4552e22dc4d0f9f62064126ec84042ead55183e316ffaa49ce29628579e",
+  "required_risk_review": true,
+  "checklist": [
+    "Hypothesis is logged before training.",
+    "Dataset snapshot and split signature are locked.",
+    "Champion/challenger comparisons require identical row contracts.",
+    "Promotion remains blocked until comparison and governance approval."
+  ]
+}

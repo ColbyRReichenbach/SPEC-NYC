@@ -1,0 +1,26 @@
+{
+  "experiment_id": "exp_20260505T013031_7a8a0611",
+  "decided_at": "2026-05-05T01:30:32.206Z",
+  "decision": "approved",
+  "reviewer": "local_reviewer",
+  "reason": "Approved for controlled challenger training with locked data contract.",
+  "previous_status": "review_requested",
+  "next_status": "review_approved",
+  "policy_checks": [
+    {
+      "name": "spec_hash_present",
+      "status": "pass",
+      "detail": "Locked hash bff4e97af62c"
+    },
+    {
+      "name": "dataset_bound",
+      "status": "pass",
+      "detail": "46cc7aa011b6fe11b2eadfe7645375fbb34121d7270d93be42671f40fa152b0e"
+    },
+    {
+      "name": "trainer_supported",
+      "status": "pass",
+      "detail": "Trainer adapter exists."
+    }
+  ]
+}

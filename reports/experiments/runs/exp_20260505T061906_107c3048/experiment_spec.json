@@ -1,0 +1,35 @@
+{
+  "id": "exp_20260505T061906_107c3048",
+  "created_at": "2026-05-05T06:19:06.157Z",
+  "locked_at": "2026-05-05T06:19:06.157Z",
+  "locked": true,
+  "hypothesis": {
+    "statement": "[EDA initial_current_data] Investigate `neighborhood=HILLCREST`: n=82, MdAPE=1.549, PPE10=0.037. Candidate action: segment-specific residual calibration or abstention rule.",
+    "expected_effect": "Reduce slice MdAPE without degrading global PPE10 or high-error review gates.",
+    "segment": "ALL",
+    "primary_metric": "MdAPE",
+    "risk_review_required": true
+  },
+  "controls": {
+    "baseline_package_id": "spec_nyc_avm_v2_20260505T053609Z_b6538c8",
+    "challenger_package_id": null,
+    "dataset_version": "rows_96_date_2020-01-01_2025-03-15",
+    "feature_contract_version": "fc_v2_20260505T053609Z_b6538c8",
+    "dataset_snapshot_sha256": "7ff428e90ac10e7cd66dd662c5e86353f7ec5e4b30403fc8400982f1e7289af4",
+    "split_signature_sha256": "e4f7e99a11f0f7918ed5d5ecb6a3ed6b4b5b35cc0a5ccbf6a745898b69fc2b1c",
+    "split_policy": "time_ordered_split",
+    "row_selection_policy": "champion_and_challenger_must_score_identical_dataset_snapshot_and_split_signature",
+    "promotion_policy": "requires_comparison_report_and_governance_approval"
+  },
+  "model_spec": {
+    "model_family": "XGBoost segment specialist",
+    "validation_plan": "Time split + borough/segment slices",
+    "trial_budget": 8,
+    "primary_metric": "MdAPE"
+  },
+  "audit": {
+    "created_by": "local_dashboard_user",
+    "source": "dashboard_experiment_preflight"
+  },
+  "spec_hash": "29cded77eadee325eb3bfa36274dd246bbb55959667c59e1320b78f959cca1ea"
+}

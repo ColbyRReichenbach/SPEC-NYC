@@ -1,0 +1,24 @@
+{
+  "artifacts": {
+    "data_profile": "reports/eda/data_profile_initial_current_data.json",
+    "feature_interaction_signals": "reports/eda/feature_interaction_signals_initial_current_data.csv",
+    "hypothesis_backlog": "reports/eda/hypothesis_backlog_initial_current_data.md",
+    "model_error_slices": "reports/eda/model_error_slices_initial_current_data.csv",
+    "quarterly_market_trends": "reports/eda/quarterly_market_trends_initial_current_data.csv",
+    "report": "reports/eda/avm_eda_report_initial_current_data.md",
+    "segment_region_summary": "reports/eda/segment_region_summary_initial_current_data.csv"
+  },
+  "command": "/Users/colbyreichenbach/Downloads/SPEC-NYC/src/eda/real_estate_eda.py --input-csv data/processed/nyc_sales_2019_2024_avm_training.csv --predictions-csv reports/model/evaluation_predictions_v2_clean_baseline.csv --tag initial_current_data",
+  "external_references": [
+    "https://researchexchange.iaao.org/jptaa/vol15/iss2/5/",
+    "https://zillow.zendesk.com/hc/en-us/articles/4402325964563-How-is-the-Zestimate-calculated",
+    "https://www.fanniemae.com/research-and-insights/perspectives/advancing-collateral-valuation"
+  ],
+  "generated_at_utc": "2026-05-05T05:55:11.590250Z",
+  "input_csv": "data/processed/nyc_sales_2019_2024_avm_training.csv",
+  "limit": null,
+  "predictions_csv": "reports/model/evaluation_predictions_v2_clean_baseline.csv",
+  "run_tag": "initial_current_data",
+  "status": "complete",
+  "workflow_stage": "eda_before_hypothesis_queue"
+}

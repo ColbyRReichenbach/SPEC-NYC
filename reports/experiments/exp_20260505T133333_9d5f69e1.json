@@ -1,0 +1,116 @@
+{
+  "id": "exp_20260505T133333_9d5f69e1",
+  "created_at": "2026-05-05T13:33:33.727Z",
+  "updated_at": "2026-05-05T13:33:33.727Z",
+  "status": "spec_locked_preflight",
+  "run_dir": "reports/experiments/runs/exp_20260505T133333_9d5f69e1",
+  "manifest_path": "reports/experiments/runs/exp_20260505T133333_9d5f69e1/run_manifest.json",
+  "spec_locked": true,
+  "spec_hash": "6c89968f78397d8dd4093369d9c447629a212247c4d9f3d59e07e9c159922bad",
+  "artifact_paths": {
+    "experiment_spec": "reports/experiments/runs/exp_20260505T133333_9d5f69e1/experiment_spec.json",
+    "dataset_snapshot": "reports/experiments/runs/exp_20260505T133333_9d5f69e1/dataset_snapshot.json",
+    "run_manifest": "reports/experiments/runs/exp_20260505T133333_9d5f69e1/run_manifest.json",
+    "comparison_report": "reports/experiments/runs/exp_20260505T133333_9d5f69e1/comparison_report.json",
+    "audit_log": "reports/experiments/runs/exp_20260505T133333_9d5f69e1/audit_log.jsonl",
+    "review_request": "reports/experiments/runs/exp_20260505T133333_9d5f69e1/review_request.json",
+    "review_decision": "reports/experiments/runs/exp_20260505T133333_9d5f69e1/review_decision.json",
+    "job_manifest": "reports/experiments/runs/exp_20260505T133333_9d5f69e1/job_manifest.json",
+    "training_stdout": "reports/experiments/runs/exp_20260505T133333_9d5f69e1/training_stdout.log",
+    "training_stderr": "reports/experiments/runs/exp_20260505T133333_9d5f69e1/training_stderr.log"
+  },
+  "hypothesis": {
+    "statement": "[EDA initial_current_data] Investigate `neighborhood=HILLCREST`: n=82, MdAPE=1.549, PPE10=0.037. Candidate action: segment-specific residual calibration or abstention rule.",
+    "expected_effect": "Reduce slice MdAPE without degrading global PPE10 or high-error review gates.",
+    "segment": "ALL",
+    "primary_metric": "MdAPE",
+    "risk_review_required": true
+  },
+  "run_plan": {
+    "model_family": "XGBoost segment specialist",
+    "validation_plan": "Time split + borough/segment slices",
+    "trial_budget": 8,
+    "baseline_package_id": "spec_nyc_avm_v2_20260505T053609Z_b6538c8",
+    "challenger_package_id": null,
+    "dataset_version": "rows_96_date_2020-01-01_2025-03-15",
+    "feature_contract_version": "fc_v2_20260505T053609Z_b6538c8",
+    "split_policy": "time_ordered_split",
+    "row_selection_policy": "champion_and_challenger_must_score_identical_dataset_snapshot_and_split_signature",
+    "promotion_policy": "requires_comparison_report_and_governance_approval"
+  },
+  "dataset_snapshot": {
+    "dataset_version": "rows_96_date_2020-01-01_2025-03-15",
+    "source_path": "reports/model/comps_smoke_training_fixture.csv",
+    "raw_rows": 498666,
+    "transformed_rows": 295457,
+    "train_rows": 76,
+    "test_rows": 20,
+    "min_sale_date": "2020-01-01",
+    "max_sale_date": "2025-03-15",
+    "data_snapshot_sha256": "7ff428e90ac10e7cd66dd662c5e86353f7ec5e4b30403fc8400982f1e7289af4",
+    "split_signature_sha256": "e4f7e99a11f0f7918ed5d5ecb6a3ed6b4b5b35cc0a5ccbf6a745898b69fc2b1c",
+    "row_identity_note": "This run is locked to the package dataset snapshot hash and split signature. Row-level ID materialization is still a future enhancement."
+  },
+  "baseline_metrics": {
+    "ppe10": 0.6,
+    "mdape": 0.08870883201604571,
+    "r2": -1.229091096548888
+  },
+  "gates": [
+    {
+      "name": "spec_locked",
+      "status": "pass",
+      "detail": "experiment_spec.json locked with hash 6c89968f7839"
+    },
+    {
+      "name": "dataset_snapshot_available",
+      "status": "pass",
+      "detail": "295,457 transformed rows available"
+    },
+    {
+      "name": "same_rows_comparison_contract",
+      "status": "pass",
+      "detail": "Champion and challenger must share split signature e4f7e99a11f0"
+    },
+    {
+      "name": "feature_contract_available",
+      "status": "pass",
+      "detail": "fc_v2_20260505T053609Z_b6538c8"
+    },
+    {
+      "name": "trainer_supported",
+      "status": "pass",
+      "detail": "This model family is wired to the repository trainer."
+    },
+    {
+      "name": "production_release_block",
+      "status": "pass",
+      "detail": "experiment is isolated from production because release gates are blocked"
+    }
+  ],
+  "production_blockers": [
+    {
+      "name": "production_model_evidence",
+      "status": "fail",
+      "detail": "model package contract failed: models/packages/spec_nyc_avm_v2_20260504T235549Z_b6538c8 - [release_decision] release_decision.decision must be approved for production eligibility (release_decision.json)"
+    },
+    {
+      "name": "arena_governance_production",
+      "status": "fail",
+      "detail": "champion alias not set for spec-nyc-avm (Registered model alias champion not found.)"
+    }
+  ],
+  "review": {
+    "required_risk_review": true
+  },
+  "training_job": null,
+  "comparison": {
+    "status": "not_started",
+    "champion_package_id": "spec_nyc_avm_v2_20260505T053609Z_b6538c8",
+    "challenger_package_id": null,
+    "same_dataset_required": true,
+    "dataset_snapshot_sha256": "7ff428e90ac10e7cd66dd662c5e86353f7ec5e4b30403fc8400982f1e7289af4",
+    "split_signature_sha256": "e4f7e99a11f0f7918ed5d5ecb6a3ed6b4b5b35cc0a5ccbf6a745898b69fc2b1c",
+    "blocking_reason": "No challenger training job has completed for this locked spec."
+  }
+}

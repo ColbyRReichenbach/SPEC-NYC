@@ -1,0 +1,28 @@
+{
+  "status": "passed",
+  "required_before_promotion": true,
+  "champion_package_id": "spec_nyc_avm_v2_20260504T235549Z_b6538c8",
+  "challenger_package_id": "spec_nyc_avm_v2_20260505T013717Z_b6538c8",
+  "same_dataset_required": true,
+  "same_dataset_contract": true,
+  "dataset_snapshot_sha256": "46cc7aa011b6fe11b2eadfe7645375fbb34121d7270d93be42671f40fa152b0e",
+  "split_signature_sha256": "98fb9acb071c5f09dfb7b6182e9370eb7d6907ebfb1c6b9a1a875a9e038c2192",
+  "candidate_split_signature_sha256": "98fb9acb071c5f09dfb7b6182e9370eb7d6907ebfb1c6b9a1a875a9e038c2192",
+  "champion_metrics": {
+    "ppe10": 0.1708691531848643,
+    "mdape": 0.31313148437500005,
+    "r2": 0.3138433722772701
+  },
+  "challenger_metrics": {
+    "ppe10": 0.18499966154470995,
+    "mdape": 0.3101718427874359,
+    "r2": 0.30495737087261154
+  },
+  "metric_deltas": {
+    "ppe10": 0.014130508359845667,
+    "mdape": -0.0029596415875641213,
+    "r2": -0.008886001404658561
+  },
+  "blocking_reason": "Comparison passed metric gates; promotion still requires manual champion approval.",
+  "generated_at": "2026-05-05T01:38:06Z"
+}

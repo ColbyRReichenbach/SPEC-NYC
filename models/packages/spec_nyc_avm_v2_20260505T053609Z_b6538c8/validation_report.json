@@ -1,0 +1,200 @@
+{
+  "confidence_metrics": {
+    "status": "not_implemented"
+  },
+  "fairness_proxy_metrics": {
+    "status": "not_evaluated"
+  },
+  "gate_results": [
+    {
+      "gate": "candidate_generation",
+      "reason": "required candidate package files generated",
+      "status": "pass"
+    },
+    {
+      "gate": "governance_approval",
+      "reason": "candidate packages are not production-approved automatically",
+      "status": "pending"
+    }
+  ],
+  "known_failures": [],
+  "model_package_id": "spec_nyc_avm_v2_20260505T053609Z_b6538c8",
+  "overall_metrics": {
+    "coefficient_of_dispersion": 4.677924858594777,
+    "mape": 0.09924575814722839,
+    "mdape": 0.08870883201604571,
+    "mean_valuation_ratio": 0.900847499345014,
+    "median_valuation_ratio": 0.9112911679839543,
+    "n": 20,
+    "overvaluation_rate_10": 0.0,
+    "overvaluation_rate_20": 0.0,
+    "ppe10": 0.6,
+    "ppe20": 0.95,
+    "ppe5": 0.15,
+    "price_related_bias": -0.45674969258818116,
+    "price_related_differential": 1.0043639842073162,
+    "r2": -1.229091096548888,
+    "signed_pct_error_mean": -0.099152500654986,
+    "signed_pct_error_median": -0.08870883201604571,
+    "undervaluation_rate_10": 0.4,
+    "undervaluation_rate_20": 0.05
+  },
+  "slice_metrics": {
+    "per_price_tier": {},
+    "per_segment": {
+      "ELEVATOR": {
+        "coefficient_of_dispersion": 4.878610263036927,
+        "mape": 0.100625755380607,
+        "mdape": 0.09433854337077835,
+        "mean_valuation_ratio": 0.8993742446193929,
+        "median_valuation_ratio": 0.9056614566292217,
+        "n": 5,
+        "overvaluation_rate_10": 0.0,
+        "overvaluation_rate_20": 0.0,
+        "ppe10": 0.6,
+        "ppe20": 1.0,
+        "ppe5": 0.2,
+        "price_related_bias": -0.44153251209584,
+        "price_related_differential": 1.0049139135863014,
+        "r2": -0.9684661298800519,
+        "signed_pct_error_mean": -0.100625755380607,
+        "signed_pct_error_median": -0.09433854337077835,
+        "undervaluation_rate_10": 0.4,
+        "undervaluation_rate_20": 0.0
+      },
+      "SINGLE_FAMILY": {
+        "coefficient_of_dispersion": 5.149988822085546,
+        "mape": 0.10991814652047682,
+        "mdape": 0.09117182302062542,
+        "mean_valuation_ratio": 0.8900818534795233,
+        "median_valuation_ratio": 0.9088281769793746,
+        "n": 5,
+        "overvaluation_rate_10": 0.0,
+        "overvaluation_rate_20": 0.0,
+        "ppe10": 0.6,
+        "ppe20": 0.8,
+        "ppe5": 0.0,
+        "price_related_bias": -0.46170675118994,
+        "price_related_differential": 1.0056634753749447,
+        "r2": -1.2006455229534918,
+        "signed_pct_error_mean": -0.10991814652047682,
+        "signed_pct_error_median": -0.09117182302062542,
+        "undervaluation_rate_10": 0.4,
+        "undervaluation_rate_20": 0.2
+      },
+      "SMALL_MULTI": {
+        "coefficient_of_dispersion": 3.8464882925192514,
+        "mape": 0.11820101645033435,
+        "mdape": 0.12927585592952098,
+        "mean_valuation_ratio": 0.8817989835496658,
+        "median_valuation_ratio": 0.870724144070479,
+        "n": 5,
+        "overvaluation_rate_10": 0.0,
+        "overvaluation_rate_20": 0.0,
+        "ppe10": 0.4,
+        "ppe20": 1.0,
+        "ppe5": 0.0,
+        "price_related_bias": -0.5286068397999929,
+        "price_related_differential": 1.0027504798454503,
+        "r2": -3.7029678334296383,
+        "signed_pct_error_mean": -0.11820101645033435,
+        "signed_pct_error_median": -0.12927585592952098,
+        "undervaluation_rate_10": 0.6,
+        "undervaluation_rate_20": 0.0
+      },
+      "WALKUP": {
+        "coefficient_of_dispersion": 3.622720692945325,
+        "mape": 0.06823811423749535,
+        "mdape": 0.0789434691538924,
+        "mean_valuation_ratio": 0.932134915731474,
+        "median_valuation_ratio": 0.9210565308461076,
+        "n": 5,
+        "overvaluation_rate_10": 0.0,
+        "overvaluation_rate_20": 0.0,
+        "ppe10": 0.8,
+        "ppe20": 1.0,
+        "ppe5": 0.4,
+        "price_related_bias": -0.3871496776687146,
+        "price_related_differential": 1.0018974186588854,
+        "r2": -1.0270650503949712,
+        "signed_pct_error_mean": -0.06786508426852587,
+        "signed_pct_error_median": -0.0789434691538924,
+        "undervaluation_rate_10": 0.2,
+        "undervaluation_rate_20": 0.0
+      }
+    }
+  },
+  "temporal_metrics": [
+    {
+      "coefficient_of_dispersion": 3.8728059274792574,
+      "mape": 0.0373188879856873,
+      "mdape": 0.0373188879856873,
+      "median_valuation_ratio": 0.9636136869367362,
+      "n": 2,
+      "period": "2024Q1",
+      "ppe10": 1.0,
+      "ppe20": 1.0,
+      "ppe5": 0.5,
+      "price_related_bias": null,
+      "price_related_differential": 1.000963114505104,
+      "r2": -3.6225021796944414
+    },
+    {
+      "coefficient_of_dispersion": 2.8484579943023034,
+      "mape": 0.1002159389151061,
+      "mdape": 0.0943385433707783,
+      "median_valuation_ratio": 0.9056614566292216,
+      "n": 5,
+      "period": "2024Q2",
+      "ppe10": 0.6,
+      "ppe20": 1.0,
+      "ppe5": 0.2,
+      "price_related_bias": -0.6835699797531286,
+      "price_related_differential": 1.0012571343173509,
+      "r2": -8.123727020331255
+    },
+    {
+      "coefficient_of_dispersion": 5.01158632912854,
+      "mape": 0.0869405993584848,
+      "mdape": 0.0735166658542817,
+      "median_valuation_ratio": 0.9264833341457182,
+      "n": 4,
+      "period": "2024Q3",
+      "ppe10": 0.75,
+      "ppe20": 1.0,
+      "ppe5": 0.25,
+      "price_related_bias": -0.4036421326051309,
+      "price_related_differential": 1.0070836928028355,
+      "r2": -0.1257823282181522
+    },
+    {
+      "coefficient_of_dispersion": 2.520850050027486,
+      "mape": 0.0847648363414575,
+      "mdape": 0.0789434691538924,
+      "median_valuation_ratio": 0.9210565308461076,
+      "n": 5,
+      "period": "2024Q4",
+      "ppe10": 0.8,
+      "ppe20": 1.0,
+      "ppe5": 0.0,
+      "price_related_bias": -0.6337456392465829,
+      "price_related_differential": 1.0010765900211611,
+      "r2": -6.466011912731847
+    },
+    {
+      "coefficient_of_dispersion": 3.378442322572322,
+      "mape": 0.1594027783141088,
+      "mdape": 0.1513075354022316,
+      "median_valuation_ratio": 0.8486924645977684,
+      "n": 4,
+      "period": "2025Q1",
+      "ppe10": 0.0,
+      "ppe20": 0.75,
+      "ppe5": 0.0,
+      "price_related_bias": -0.6795411823118983,
+      "price_related_differential": 1.0014726099515785,
+      "r2": -17.200751068718752
+    }
+  ],
+  "validation_status": "candidate_pending_approval"
+}

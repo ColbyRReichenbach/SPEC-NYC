@@ -1,0 +1,3 @@
+{"event":"experiment_spec_locked","created_at":"2026-05-05T13:36:54.117Z","experiment_id":"exp_20260505T133654_4dbbbf23","spec_hash":"9aad1f027a38796113a6e2b816d71f5186fb8daad7c2d7eeac5350d530c4a6fe"}
+{"event":"dataset_snapshot_bound","created_at":"2026-05-05T13:36:54.117Z","experiment_id":"exp_20260505T133654_4dbbbf23","data_snapshot_sha256":"7ff428e90ac10e7cd66dd662c5e86353f7ec5e4b30403fc8400982f1e7289af4","split_signature_sha256":"e4f7e99a11f0f7918ed5d5ecb6a3ed6b4b5b35cc0a5ccbf6a745898b69fc2b1c"}
+{"event":"comparison_contract_created","created_at":"2026-05-05T13:36:54.117Z","experiment_id":"exp_20260505T133654_4dbbbf23","same_dataset_required":true}

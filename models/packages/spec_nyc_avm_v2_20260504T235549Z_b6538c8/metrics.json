@@ -1,0 +1,113 @@
+{
+  "metadata": {
+    "artifact_tag": "clean_baseline",
+    "best_params": {},
+    "dataset_version": "nyc_open_data_2019_2024_v2_bootstrap",
+    "feature_columns": [
+      "gross_square_feet",
+      "year_built",
+      "building_age",
+      "residential_units",
+      "total_units",
+      "distance_to_center_km",
+      "h3_price_lag",
+      "days_since_2019_start",
+      "month_sin",
+      "month_cos",
+      "borough",
+      "building_class",
+      "property_segment",
+      "neighborhood",
+      "rate_regime_bucket"
+    ],
+    "feature_contract_version": "fc_v2_20260504T235549Z_b6538c8",
+    "feature_drift_alerts": 96,
+    "feature_drift_rows": 360,
+    "feature_drift_warnings": 43,
+    "feature_missingness_rows": 360,
+    "min_segment_rows": 2000,
+    "model_package_id": "spec_nyc_avm_v2_20260504T235549Z_b6538c8",
+    "model_strategy": "global",
+    "model_version": "v2",
+    "optuna_trials": 0,
+    "price_tier_proxy_bins_version": null,
+    "router_columns": [],
+    "router_mode": "segment_only",
+    "segment_model_count": 0,
+    "segment_ppe10_variance": 0.1232407511328386,
+    "segment_variance_flag_v2": false,
+    "target": "sale_price",
+    "target_transform": "none",
+    "temporal_mdape_last_minus_first": -0.0016978784921015122,
+    "temporal_mdape_max": 0.3286220787207872,
+    "temporal_mdape_min": 0.29737909207161123,
+    "temporal_mdape_std": 0.009893346882505014,
+    "temporal_period_count": 6,
+    "temporal_period_freq": "Q",
+    "temporal_ppe10_last_minus_first": -0.017291595039579583,
+    "temporal_ppe10_max": 0.1841347219144693,
+    "temporal_ppe10_min": 0.1623585591196927,
+    "temporal_ppe10_std": 0.007575452940545465,
+    "test_rows": 59092,
+    "train_rows": 236365,
+    "trained_at_utc": "2026-05-04T23:55:55.525191"
+  },
+  "overall": {
+    "mdape": 0.31313148437500005,
+    "n": 59092,
+    "ppe10": 0.1708691531848643,
+    "r2": 0.3138433722772701
+  },
+  "per_price_tier": {
+    "core": {
+      "mdape": 0.281324615965973,
+      "n": 14512,
+      "ppe10": 0.18012679162072767,
+      "r2": -65.942578417785
+    },
+    "entry": {
+      "mdape": 0.45897853512664416,
+      "n": 13024,
+      "ppe10": 0.15241093366093367,
+      "r2": -54.7142682391403
+    },
+    "luxury": {
+      "mdape": 0.3096074736251947,
+      "n": 16212,
+      "ppe10": 0.1642610412040464,
+      "r2": 0.283018792687576
+    },
+    "premium": {
+      "mdape": 0.2750191461124615,
+      "n": 15344,
+      "ppe10": 0.18476277372262773,
+      "r2": -35.75429046729898
+    }
+  },
+  "per_segment": {
+    "ELEVATOR": {
+      "mdape": 0.47862564393939394,
+      "n": 25783,
+      "ppe10": 0.11848892681224063,
+      "r2": 0.29019468203480236
+    },
+    "SINGLE_FAMILY": {
+      "mdape": 0.20771565942901438,
+      "n": 25148,
+      "ppe10": 0.2400986161921425,
+      "r2": 0.5845484092368212
+    },
+    "SMALL_MULTI": {
+      "mdape": 0.40757678888057114,
+      "n": 3018,
+      "ppe10": 0.133532140490391,
+      "r2": 0.2793762502264373
+    },
+    "WALKUP": {
+      "mdape": 0.43314700374531834,
+      "n": 5143,
+      "ppe10": 0.11685786505930391,
+      "r2": 0.2952723351594304
+    }
+  }
+}

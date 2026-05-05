@@ -1,0 +1,30 @@
+{
+  "id": "exp_20260505T053452_8a4120cb",
+  "created_at": "2026-05-05T05:34:52.780Z",
+  "updated_at": "2026-05-05T05:34:53.509Z",
+  "status": "review_approved",
+  "run_type": "governed_experiment_lifecycle",
+  "spec_locked": true,
+  "spec_hash": "327e084cbcec0637bef86b9f83dcb661eab3ba870bbf6528c461b38afb3c2647",
+  "lifecycle": [
+    "spec_locked",
+    "dataset_snapshot_bound",
+    "comparison_contract_created",
+    "awaiting_review_request",
+    "review_requested",
+    "review_approved"
+  ],
+  "training_job": null,
+  "artifact_paths": {
+    "experiment_spec": "reports/experiments/runs/exp_20260505T053452_8a4120cb/experiment_spec.json",
+    "dataset_snapshot": "reports/experiments/runs/exp_20260505T053452_8a4120cb/dataset_snapshot.json",
+    "run_manifest": "reports/experiments/runs/exp_20260505T053452_8a4120cb/run_manifest.json",
+    "comparison_report": "reports/experiments/runs/exp_20260505T053452_8a4120cb/comparison_report.json",
+    "audit_log": "reports/experiments/runs/exp_20260505T053452_8a4120cb/audit_log.jsonl",
+    "review_request": "reports/experiments/runs/exp_20260505T053452_8a4120cb/review_request.json",
+    "review_decision": "reports/experiments/runs/exp_20260505T053452_8a4120cb/review_decision.json",
+    "job_manifest": "reports/experiments/runs/exp_20260505T053452_8a4120cb/job_manifest.json",
+    "training_stdout": "reports/experiments/runs/exp_20260505T053452_8a4120cb/training_stdout.log",
+    "training_stderr": "reports/experiments/runs/exp_20260505T053452_8a4120cb/training_stderr.log"
+  }
+}

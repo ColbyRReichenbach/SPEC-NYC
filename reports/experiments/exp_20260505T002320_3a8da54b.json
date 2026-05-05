@@ -1,0 +1,55 @@
+{
+  "id": "exp_20260505T002320_3a8da54b",
+  "created_at": "2026-05-05T00:23:20.364Z",
+  "status": "preflight_logged",
+  "manifest_path": "reports/experiments/exp_20260505T002320_3a8da54b.json",
+  "hypothesis": {
+    "statement": "H3 lag ablation should expose spatial leakage risk before model promotion.",
+    "expected_effect": "Measure MdAPE sensitivity before release.",
+    "segment": "ALL",
+    "primary_metric": "MdAPE",
+    "risk_review_required": true
+  },
+  "run_plan": {
+    "model_family": "Ablation study",
+    "validation_plan": "Ablation against v2 baseline",
+    "trial_budget": 3,
+    "baseline_package_id": "spec_nyc_avm_v2_20260504T235549Z_b6538c8",
+    "dataset_version": "nyc_open_data_2019_2024_v2_bootstrap",
+    "feature_contract_version": "fc_v2_20260504T235549Z_b6538c8"
+  },
+  "baseline_metrics": {
+    "ppe10": 0.1708691531848643,
+    "mdape": 0.31313148437500005,
+    "r2": 0.3138433722772701
+  },
+  "gates": [
+    {
+      "name": "data_snapshot_available",
+      "status": "pass",
+      "detail": "295,457 transformed rows available"
+    },
+    {
+      "name": "feature_contract_available",
+      "status": "pass",
+      "detail": "fc_v2_20260504T235549Z_b6538c8"
+    },
+    {
+      "name": "production_release_block",
+      "status": "pass",
+      "detail": "experiment is isolated from production because release gates are blocked"
+    }
+  ],
+  "production_blockers": [
+    {
+      "name": "production_model_evidence",
+      "status": "fail",
+      "detail": "model package contract failed: models/packages/spec_nyc_avm_v2_20260504T235549Z_b6538c8 - [release_decision] release_decision.decision must be approved for production eligibility (release_decision.json)"
+    },
+    {
+      "name": "arena_governance_production",
+      "status": "fail",
+      "detail": "champion alias not set for spec-nyc-avm (Registered model alias champion not found.)"
+    }
+  ]
+}

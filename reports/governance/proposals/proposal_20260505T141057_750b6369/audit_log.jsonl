@@ -1,0 +1,2 @@
+{"event":"release_proposal_created","created_at":"2026-05-05T14:10:57.063Z","proposal_id":"proposal_20260505T141057_750b6369","experiment_id":"exp_20260505T013702_0e9d360f","candidate_package_id":"spec_nyc_avm_v2_20260505T013717Z_b6538c8","status":"blocked"}
+{"event":"release_proposal_rejected","created_at":"2026-05-05T14:10:58.785Z","proposal_id":"proposal_20260505T141057_750b6369","candidate_package_id":"spec_nyc_avm_v2_20260505T013717Z_b6538c8","rejected_by":"local_release_owner","reason":"Rejected by Playwright governance QA."}

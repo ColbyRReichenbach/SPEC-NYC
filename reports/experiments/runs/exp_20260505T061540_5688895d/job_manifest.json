@@ -1,0 +1,58 @@
+{
+  "id": "job_exp_20260505T061540_5688895d",
+  "experiment_id": "exp_20260505T061540_5688895d",
+  "status": "queued",
+  "queued_at": "2026-05-05T06:15:41.206Z",
+  "queued_by": "local_dashboard_user",
+  "reason": "Approved experiment queued from dashboard.",
+  "worker_module": "src.experiments.worker",
+  "execution_mode": "repo_worker_subprocess",
+  "command": [
+    "python3",
+    "-m",
+    "src.model",
+    "--input-csv",
+    "reports/model/comps_smoke_training_fixture.csv",
+    "--model-version",
+    "v2",
+    "--artifact-tag",
+    "exp_20260505T061540_5688895d",
+    "--dataset-version",
+    "rows_96_date_2020-01-01_2025-03-15",
+    "--optuna-trials",
+    "12",
+    "--shap-sample-size",
+    "250",
+    "--no-mlflow",
+    "--strategy",
+    "segmented_router",
+    "--router-mode",
+    "segment_only",
+    "--min-segment-rows",
+    "2000"
+  ],
+  "command_display": "python3 -m src.model --input-csv reports/model/comps_smoke_training_fixture.csv --model-version v2 --artifact-tag exp_20260505T061540_5688895d --dataset-version rows_96_date_2020-01-01_2025-03-15 --optuna-trials 12 --shap-sample-size 250 --no-mlflow --strategy segmented_router --router-mode segment_only --min-segment-rows 2000",
+  "cwd": ".",
+  "logs": {
+    "stdout": "reports/experiments/runs/exp_20260505T061540_5688895d/training_stdout.log",
+    "stderr": "reports/experiments/runs/exp_20260505T061540_5688895d/training_stderr.log"
+  },
+  "training_plan": {
+    "model_family": "XGBoost segment specialist",
+    "trainer_strategy": "segmented_router",
+    "router_mode": "segment_only",
+    "optuna_trials": 12,
+    "shap_sample_size": 250,
+    "dataset_version": "rows_96_date_2020-01-01_2025-03-15",
+    "artifact_tag": "exp_20260505T061540_5688895d"
+  },
+  "input_dataset": {
+    "source_path": "reports/model/comps_smoke_training_fixture.csv",
+    "data_snapshot_sha256": "7ff428e90ac10e7cd66dd662c5e86353f7ec5e4b30403fc8400982f1e7289af4",
+    "split_signature_sha256": "e4f7e99a11f0f7918ed5d5ecb6a3ed6b4b5b35cc0a5ccbf6a745898b69fc2b1c"
+  },
+  "output": {
+    "model_package_id": null,
+    "model_package_path": null
+  }
+}

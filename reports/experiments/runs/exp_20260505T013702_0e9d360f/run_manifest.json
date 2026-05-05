@@ -1,0 +1,89 @@
+{
+  "id": "exp_20260505T013702_0e9d360f",
+  "created_at": "2026-05-05T01:37:02.488Z",
+  "updated_at": "2026-05-05T01:38:06Z",
+  "status": "completed",
+  "run_type": "governed_experiment_lifecycle",
+  "spec_locked": true,
+  "spec_hash": "4964b4552e22dc4d0f9f62064126ec84042ead55183e316ffaa49ce29628579e",
+  "lifecycle": [
+    "spec_locked",
+    "dataset_snapshot_bound",
+    "comparison_contract_created",
+    "awaiting_review_request",
+    "review_requested",
+    "review_approved",
+    "training_job_queued",
+    "training_job_started",
+    "training_job_completed"
+  ],
+  "training_job": {
+    "id": "job_exp_20260505T013702_0e9d360f",
+    "experiment_id": "exp_20260505T013702_0e9d360f",
+    "status": "completed",
+    "queued_at": "2026-05-05T01:37:03.995Z",
+    "queued_by": "local_dashboard_user",
+    "reason": "Queue one real trainer-backed smoke verification job.",
+    "worker_module": "src.experiments.worker",
+    "execution_mode": "repo_worker_subprocess",
+    "command": [
+      "python3",
+      "-m",
+      "src.model",
+      "--input-csv",
+      "data/processed/nyc_sales_2019_2024_avm_training.csv",
+      "--model-version",
+      "v2",
+      "--artifact-tag",
+      "exp_20260505T013702_0e9d360f",
+      "--dataset-version",
+      "nyc_open_data_2019_2024_v2_bootstrap",
+      "--optuna-trials",
+      "1",
+      "--shap-sample-size",
+      "250",
+      "--no-mlflow",
+      "--strategy",
+      "global"
+    ],
+    "command_display": "python3 -m src.model --input-csv data/processed/nyc_sales_2019_2024_avm_training.csv --model-version v2 --artifact-tag exp_20260505T013702_0e9d360f --dataset-version nyc_open_data_2019_2024_v2_bootstrap --optuna-trials 1 --shap-sample-size 250 --no-mlflow --strategy global",
+    "cwd": ".",
+    "logs": {
+      "stdout": "reports/experiments/runs/exp_20260505T013702_0e9d360f/training_stdout.log",
+      "stderr": "reports/experiments/runs/exp_20260505T013702_0e9d360f/training_stderr.log"
+    },
+    "training_plan": {
+      "model_family": "Global XGBoost baseline",
+      "trainer_strategy": "global",
+      "router_mode": "segment_only",
+      "optuna_trials": 1,
+      "shap_sample_size": 250,
+      "dataset_version": "nyc_open_data_2019_2024_v2_bootstrap",
+      "artifact_tag": "exp_20260505T013702_0e9d360f"
+    },
+    "input_dataset": {
+      "source_path": "data/processed/nyc_sales_2019_2024_avm_training.csv",
+      "data_snapshot_sha256": "46cc7aa011b6fe11b2eadfe7645375fbb34121d7270d93be42671f40fa152b0e",
+      "split_signature_sha256": "98fb9acb071c5f09dfb7b6182e9370eb7d6907ebfb1c6b9a1a875a9e038c2192"
+    },
+    "output": {
+      "model_package_id": "spec_nyc_avm_v2_20260505T013717Z_b6538c8",
+      "model_package_path": "models/packages/spec_nyc_avm_v2_20260505T013717Z_b6538c8"
+    },
+    "started_at": "2026-05-05T01:37:07Z",
+    "exit_code": 0,
+    "completed_at": "2026-05-05T01:38:06Z"
+  },
+  "artifact_paths": {
+    "experiment_spec": "reports/experiments/runs/exp_20260505T013702_0e9d360f/experiment_spec.json",
+    "dataset_snapshot": "reports/experiments/runs/exp_20260505T013702_0e9d360f/dataset_snapshot.json",
+    "run_manifest": "reports/experiments/runs/exp_20260505T013702_0e9d360f/run_manifest.json",
+    "comparison_report": "reports/experiments/runs/exp_20260505T013702_0e9d360f/comparison_report.json",
+    "audit_log": "reports/experiments/runs/exp_20260505T013702_0e9d360f/audit_log.jsonl",
+    "review_request": "reports/experiments/runs/exp_20260505T013702_0e9d360f/review_request.json",
+    "review_decision": "reports/experiments/runs/exp_20260505T013702_0e9d360f/review_decision.json",
+    "job_manifest": "reports/experiments/runs/exp_20260505T013702_0e9d360f/job_manifest.json",
+    "training_stdout": "reports/experiments/runs/exp_20260505T013702_0e9d360f/training_stdout.log",
+    "training_stderr": "reports/experiments/runs/exp_20260505T013702_0e9d360f/training_stderr.log"
+  }
+}

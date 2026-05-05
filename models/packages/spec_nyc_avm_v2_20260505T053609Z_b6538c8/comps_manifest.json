@@ -1,0 +1,86 @@
+{
+  "config": {
+    "fallback_max_age_days": 1825,
+    "max_age_diff_years": 50.0,
+    "max_candidate_pool_fallback": 600,
+    "max_candidate_pool_per_group": 300,
+    "max_distance_km": 3.0,
+    "max_sqft_ratio_diff": 0.75,
+    "max_unit_diff": 10.0,
+    "min_comps": 3,
+    "primary_max_age_days": 730,
+    "top_k": 8
+  },
+  "eligibility_policy": {
+    "as_of_rule": "comp.sale_date < valuation.sale_date",
+    "fallback_policy": "If primary filters produce fewer than min_comps, keep same-borough compatible-segment historical candidates up to fallback_max_age_days and rank with explicit distance/feature penalties.",
+    "primary_filters": [
+      "same borough",
+      "same or compatible property segment",
+      "within primary_max_age_days",
+      "within max_distance_km when coordinates are available",
+      "within max_sqft_ratio_diff when square footage is available",
+      "within max_age_diff_years when building age is available",
+      "within max_unit_diff when unit counts are available"
+    ],
+    "reference_policy": {
+      "test_rows": "training split rows only; holdout targets are never eligible comps",
+      "train_rows": "historical rows from the training split only"
+    },
+    "required_sale_validity_status": "valid_training_sale"
+  },
+  "feature_names": [
+    "comp_count",
+    "comp_median_price",
+    "comp_median_ppsf",
+    "comp_weighted_estimate",
+    "comp_price_dispersion",
+    "comp_nearest_distance_km",
+    "comp_median_recency_days",
+    "comp_local_momentum"
+  ],
+  "selected_comps_rows": 84,
+  "selected_comps_schema_version": 1,
+  "test": {
+    "comp_count": {
+      "max": 6.0,
+      "median": 4.0,
+      "min": 3.0,
+      "no_comp_rate": 0.0,
+      "sparse_comp_rate": 0.0
+    },
+    "missing_rates": {
+      "comp_count": 0.0,
+      "comp_local_momentum": 0.15,
+      "comp_median_ppsf": 0.0,
+      "comp_median_price": 0.0,
+      "comp_median_recency_days": 0.0,
+      "comp_nearest_distance_km": 0.0,
+      "comp_price_dispersion": 0.0,
+      "comp_weighted_estimate": 0.0
+    },
+    "row_count": 20,
+    "selected_comps_rows": 84
+  },
+  "train": {
+    "comp_count": {
+      "max": 6.0,
+      "median": 5.0,
+      "min": 0.0,
+      "no_comp_rate": 0.039473684210526314,
+      "sparse_comp_rate": 0.11842105263157894
+    },
+    "missing_rates": {
+      "comp_count": 0.0,
+      "comp_local_momentum": 0.2631578947368421,
+      "comp_median_ppsf": 0.039473684210526314,
+      "comp_median_price": 0.039473684210526314,
+      "comp_median_recency_days": 0.039473684210526314,
+      "comp_nearest_distance_km": 0.039473684210526314,
+      "comp_price_dispersion": 0.07894736842105263,
+      "comp_weighted_estimate": 0.039473684210526314
+    },
+    "row_count": 76,
+    "selected_comps_rows": 0
+  }
+}

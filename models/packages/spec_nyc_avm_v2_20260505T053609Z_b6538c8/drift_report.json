@@ -1,0 +1,10 @@
+{
+  "row_count": 450,
+  "source_csv": "reports/model/feature_drift_segment_time_v2_comps_smoke_fixture.csv",
+  "status": "generated",
+  "status_counts": {
+    "alert": 88,
+    "ok": 360,
+    "warn": 2
+  }
+}

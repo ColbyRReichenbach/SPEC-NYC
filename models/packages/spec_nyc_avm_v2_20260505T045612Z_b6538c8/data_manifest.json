@@ -1,0 +1,26 @@
+{
+  "created_at_utc": "2026-05-05T04:56:18.805135Z",
+  "data_freshness": {
+    "max_sale_date": "2020-05-19"
+  },
+  "data_snapshot_sha256": "aedb7c26f25459065577236a49fb8bb0772d6bee19f59a5088a2dcef0add028c",
+  "dataset_version": "precomps_smoke_fixture",
+  "known_limitations": [
+    "Candidate package generated from available project data only.",
+    "Not approved for production use until release_decision.decision is updated by governance workflow.",
+    "Public NYC data may omit condition, renovation quality, listing media, concessions, and private transaction context."
+  ],
+  "max_sale_date": "2020-05-19",
+  "min_sale_date": "2020-01-01",
+  "post_filter_row_count": 140,
+  "raw_row_count": 140,
+  "schema_hash": "2dbdeb88c6ba101f8e3e602125bd3761b13b5dcaaaa4b593efe52c0cd1a1b8dd",
+  "sources": [
+    {
+      "extracted_at_utc": "2026-05-05T04:56:12.074647Z",
+      "name": "training_source",
+      "row_count": 140,
+      "uri": "programmatic_dataframe"
+    }
+  ]
+}

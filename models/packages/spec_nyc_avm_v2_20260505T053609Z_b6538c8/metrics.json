@@ -1,0 +1,297 @@
+{
+  "metadata": {
+    "artifact_tag": "comps_smoke_fixture",
+    "best_params": {},
+    "comparable_sales_features": {
+      "config": {
+        "fallback_max_age_days": 1825,
+        "max_age_diff_years": 50.0,
+        "max_candidate_pool_fallback": 600,
+        "max_candidate_pool_per_group": 300,
+        "max_distance_km": 3.0,
+        "max_sqft_ratio_diff": 0.75,
+        "max_unit_diff": 10.0,
+        "min_comps": 3,
+        "primary_max_age_days": 730,
+        "top_k": 8
+      },
+      "eligibility_policy": {
+        "as_of_rule": "comp.sale_date < valuation.sale_date",
+        "fallback_policy": "If primary filters produce fewer than min_comps, keep same-borough compatible-segment historical candidates up to fallback_max_age_days and rank with explicit distance/feature penalties.",
+        "primary_filters": [
+          "same borough",
+          "same or compatible property segment",
+          "within primary_max_age_days",
+          "within max_distance_km when coordinates are available",
+          "within max_sqft_ratio_diff when square footage is available",
+          "within max_age_diff_years when building age is available",
+          "within max_unit_diff when unit counts are available"
+        ],
+        "reference_policy": {
+          "test_rows": "training split rows only; holdout targets are never eligible comps",
+          "train_rows": "historical rows from the training split only"
+        },
+        "required_sale_validity_status": "valid_training_sale"
+      },
+      "feature_names": [
+        "comp_count",
+        "comp_median_price",
+        "comp_median_ppsf",
+        "comp_weighted_estimate",
+        "comp_price_dispersion",
+        "comp_nearest_distance_km",
+        "comp_median_recency_days",
+        "comp_local_momentum"
+      ],
+      "selected_comps_rows": 84,
+      "selected_comps_schema_version": 1,
+      "test": {
+        "comp_count": {
+          "max": 6.0,
+          "median": 4.0,
+          "min": 3.0,
+          "no_comp_rate": 0.0,
+          "sparse_comp_rate": 0.0
+        },
+        "missing_rates": {
+          "comp_count": 0.0,
+          "comp_local_momentum": 0.15,
+          "comp_median_ppsf": 0.0,
+          "comp_median_price": 0.0,
+          "comp_median_recency_days": 0.0,
+          "comp_nearest_distance_km": 0.0,
+          "comp_price_dispersion": 0.0,
+          "comp_weighted_estimate": 0.0
+        },
+        "row_count": 20,
+        "selected_comps_rows": 84
+      },
+      "train": {
+        "comp_count": {
+          "max": 6.0,
+          "median": 5.0,
+          "min": 0.0,
+          "no_comp_rate": 0.039473684210526314,
+          "sparse_comp_rate": 0.11842105263157894
+        },
+        "missing_rates": {
+          "comp_count": 0.0,
+          "comp_local_momentum": 0.2631578947368421,
+          "comp_median_ppsf": 0.039473684210526314,
+          "comp_median_price": 0.039473684210526314,
+          "comp_median_recency_days": 0.039473684210526314,
+          "comp_nearest_distance_km": 0.039473684210526314,
+          "comp_price_dispersion": 0.07894736842105263,
+          "comp_weighted_estimate": 0.039473684210526314
+        },
+        "row_count": 76,
+        "selected_comps_rows": 0
+      }
+    },
+    "dataset_version": "rows_96_date_2020-01-01_2025-03-15",
+    "feature_columns": [
+      "gross_square_feet",
+      "year_built",
+      "building_age",
+      "residential_units",
+      "total_units",
+      "distance_to_center_km",
+      "h3_prior_sale_count",
+      "h3_prior_median_price",
+      "h3_prior_median_ppsf",
+      "comp_count",
+      "comp_median_price",
+      "comp_median_ppsf",
+      "comp_weighted_estimate",
+      "comp_price_dispersion",
+      "comp_nearest_distance_km",
+      "comp_median_recency_days",
+      "comp_local_momentum",
+      "days_since_2019_start",
+      "month_sin",
+      "month_cos",
+      "borough",
+      "building_class",
+      "property_segment",
+      "neighborhood",
+      "rate_regime_bucket"
+    ],
+    "feature_contract_version": "fc_v2_20260505T053609Z_b6538c8",
+    "feature_drift_alerts": 88,
+    "feature_drift_rows": 450,
+    "feature_drift_warnings": 2,
+    "feature_missingness_rows": 450,
+    "high_error_review_rows": 20,
+    "local_market_features": {
+      "as_of_policy": "strictly_less_than_row_sale_date",
+      "feature_names": [
+        "h3_prior_sale_count",
+        "h3_prior_median_price",
+        "h3_prior_median_ppsf"
+      ],
+      "min_h3_prior_count_for_h3_median": 3,
+      "reference_policy": {
+        "test_rows": "training split rows only; holdout targets are never used",
+        "train_rows": "expanding historical rows from the training split only"
+      },
+      "test_missing_rates": {
+        "h3_prior_median_ppsf": 0.0,
+        "h3_prior_median_price": 0.0,
+        "h3_prior_sale_count": 0.0
+      },
+      "train_missing_rates": {
+        "h3_prior_median_ppsf": 0.013157894736842105,
+        "h3_prior_median_price": 0.013157894736842105,
+        "h3_prior_sale_count": 0.0
+      }
+    },
+    "min_segment_rows": 2000,
+    "model_package_id": "spec_nyc_avm_v2_20260505T053609Z_b6538c8",
+    "model_strategy": "global",
+    "model_version": "v2",
+    "optuna_trials": 0,
+    "pre_comps_readiness_status": "pre_comps_ready",
+    "price_tier_proxy_bins_version": null,
+    "router_columns": [],
+    "router_mode": "segment_only",
+    "sale_validity": {
+      "reason_counts": {
+        "none": 96
+      },
+      "status_counts": {
+        "valid_training_sale": 96
+      }
+    },
+    "segment_model_count": 0,
+    "segment_ppe10_variance": 0.4,
+    "segment_variance_flag_v2": true,
+    "selected_comps_rows": 84,
+    "split_manifest": {
+      "all_row_ids_sha256": "5beafcd8964d788379bbc491a225220c16dd625f0230202c6220d0948b294c60",
+      "duplicate_row_ids": 0,
+      "row_count": 96,
+      "test_row_ids_sha256": "938e88e73942fe40d5b7d48796f74daa9929fe63d96d00a22e9ff40680d9b81f",
+      "test_rows": 20,
+      "train_row_ids_sha256": "5bc2e1bd13f2a554254bd9c6e9cbd8ee742d869b82e5a1e952b42b90861ec16e",
+      "train_rows": 76
+    },
+    "target": "sale_price",
+    "target_transform": "none",
+    "temporal_mdape_last_minus_first": 0.11398864741654428,
+    "temporal_mdape_max": 0.15130753540223163,
+    "temporal_mdape_min": 0.037318887985687346,
+    "temporal_mdape_std": 0.03715965033729377,
+    "temporal_period_count": 5,
+    "temporal_period_freq": "Q",
+    "temporal_ppe10_last_minus_first": -1.0,
+    "temporal_ppe10_max": 1.0,
+    "temporal_ppe10_min": 0.0,
+    "temporal_ppe10_std": 0.34,
+    "test_rows": 20,
+    "train_rows": 76,
+    "trained_at_utc": "2026-05-05T05:36:12.052841"
+  },
+  "overall": {
+    "coefficient_of_dispersion": 4.677924858594777,
+    "mape": 0.09924575814722839,
+    "mdape": 0.08870883201604571,
+    "mean_valuation_ratio": 0.900847499345014,
+    "median_valuation_ratio": 0.9112911679839543,
+    "n": 20,
+    "overvaluation_rate_10": 0.0,
+    "overvaluation_rate_20": 0.0,
+    "ppe10": 0.6,
+    "ppe20": 0.95,
+    "ppe5": 0.15,
+    "price_related_bias": -0.45674969258818116,
+    "price_related_differential": 1.0043639842073162,
+    "r2": -1.229091096548888,
+    "signed_pct_error_mean": -0.099152500654986,
+    "signed_pct_error_median": -0.08870883201604571,
+    "undervaluation_rate_10": 0.4,
+    "undervaluation_rate_20": 0.05
+  },
+  "per_price_tier": {},
+  "per_segment": {
+    "ELEVATOR": {
+      "coefficient_of_dispersion": 4.878610263036927,
+      "mape": 0.100625755380607,
+      "mdape": 0.09433854337077835,
+      "mean_valuation_ratio": 0.8993742446193929,
+      "median_valuation_ratio": 0.9056614566292217,
+      "n": 5,
+      "overvaluation_rate_10": 0.0,
+      "overvaluation_rate_20": 0.0,
+      "ppe10": 0.6,
+      "ppe20": 1.0,
+      "ppe5": 0.2,
+      "price_related_bias": -0.44153251209584,
+      "price_related_differential": 1.0049139135863014,
+      "r2": -0.9684661298800519,
+      "signed_pct_error_mean": -0.100625755380607,
+      "signed_pct_error_median": -0.09433854337077835,
+      "undervaluation_rate_10": 0.4,
+      "undervaluation_rate_20": 0.0
+    },
+    "SINGLE_FAMILY": {
+      "coefficient_of_dispersion": 5.149988822085546,
+      "mape": 0.10991814652047682,
+      "mdape": 0.09117182302062542,
+      "mean_valuation_ratio": 0.8900818534795233,
+      "median_valuation_ratio": 0.9088281769793746,
+      "n": 5,
+      "overvaluation_rate_10": 0.0,
+      "overvaluation_rate_20": 0.0,
+      "ppe10": 0.6,
+      "ppe20": 0.8,
+      "ppe5": 0.0,
+      "price_related_bias": -0.46170675118994,
+      "price_related_differential": 1.0056634753749447,
+      "r2": -1.2006455229534918,
+      "signed_pct_error_mean": -0.10991814652047682,
+      "signed_pct_error_median": -0.09117182302062542,
+      "undervaluation_rate_10": 0.4,
+      "undervaluation_rate_20": 0.2
+    },
+    "SMALL_MULTI": {
+      "coefficient_of_dispersion": 3.8464882925192514,
+      "mape": 0.11820101645033435,
+      "mdape": 0.12927585592952098,
+      "mean_valuation_ratio": 0.8817989835496658,
+      "median_valuation_ratio": 0.870724144070479,
+      "n": 5,
+      "overvaluation_rate_10": 0.0,
+      "overvaluation_rate_20": 0.0,
+      "ppe10": 0.4,
+      "ppe20": 1.0,
+      "ppe5": 0.0,
+      "price_related_bias": -0.5286068397999929,
+      "price_related_differential": 1.0027504798454503,
+      "r2": -3.7029678334296383,
+      "signed_pct_error_mean": -0.11820101645033435,
+      "signed_pct_error_median": -0.12927585592952098,
+      "undervaluation_rate_10": 0.6,
+      "undervaluation_rate_20": 0.0
+    },
+    "WALKUP": {
+      "coefficient_of_dispersion": 3.622720692945325,
+      "mape": 0.06823811423749535,
+      "mdape": 0.0789434691538924,
+      "mean_valuation_ratio": 0.932134915731474,
+      "median_valuation_ratio": 0.9210565308461076,
+      "n": 5,
+      "overvaluation_rate_10": 0.0,
+      "overvaluation_rate_20": 0.0,
+      "ppe10": 0.8,
+      "ppe20": 1.0,
+      "ppe5": 0.4,
+      "price_related_bias": -0.3871496776687146,
+      "price_related_differential": 1.0018974186588854,
+      "r2": -1.0270650503949712,
+      "signed_pct_error_mean": -0.06786508426852587,
+      "signed_pct_error_median": -0.0789434691538924,
+      "undervaluation_rate_10": 0.2,
+      "undervaluation_rate_20": 0.0
+    }
+  }
+}

@@ -1,0 +1,179 @@
+{
+  "id": "exp_20260505T013702_0e9d360f",
+  "created_at": "2026-05-05T01:37:02.488Z",
+  "updated_at": "2026-05-05T01:38:06Z",
+  "status": "completed",
+  "run_dir": "reports/experiments/runs/exp_20260505T013702_0e9d360f",
+  "manifest_path": "reports/experiments/runs/exp_20260505T013702_0e9d360f/run_manifest.json",
+  "spec_locked": true,
+  "spec_hash": "4964b4552e22dc4d0f9f62064126ec84042ead55183e316ffaa49ce29628579e",
+  "artifact_paths": {
+    "experiment_spec": "reports/experiments/runs/exp_20260505T013702_0e9d360f/experiment_spec.json",
+    "dataset_snapshot": "reports/experiments/runs/exp_20260505T013702_0e9d360f/dataset_snapshot.json",
+    "run_manifest": "reports/experiments/runs/exp_20260505T013702_0e9d360f/run_manifest.json",
+    "comparison_report": "reports/experiments/runs/exp_20260505T013702_0e9d360f/comparison_report.json",
+    "audit_log": "reports/experiments/runs/exp_20260505T013702_0e9d360f/audit_log.jsonl",
+    "review_request": "reports/experiments/runs/exp_20260505T013702_0e9d360f/review_request.json",
+    "review_decision": "reports/experiments/runs/exp_20260505T013702_0e9d360f/review_decision.json",
+    "job_manifest": "reports/experiments/runs/exp_20260505T013702_0e9d360f/job_manifest.json",
+    "training_stdout": "reports/experiments/runs/exp_20260505T013702_0e9d360f/training_stdout.log",
+    "training_stderr": "reports/experiments/runs/exp_20260505T013702_0e9d360f/training_stderr.log"
+  },
+  "hypothesis": {
+    "statement": "Global XGBoost smoke challenger should exercise the governed worker path end to end.",
+    "expected_effect": "Generate a real challenger package and comparison artifact.",
+    "segment": "ALL",
+    "primary_metric": "MdAPE",
+    "risk_review_required": true
+  },
+  "run_plan": {
+    "model_family": "Global XGBoost baseline",
+    "validation_plan": "Time split + borough/segment slices",
+    "trial_budget": 1,
+    "baseline_package_id": "spec_nyc_avm_v2_20260504T235549Z_b6538c8",
+    "challenger_package_id": "spec_nyc_avm_v2_20260505T013717Z_b6538c8",
+    "dataset_version": "nyc_open_data_2019_2024_v2_bootstrap",
+    "feature_contract_version": "fc_v2_20260504T235549Z_b6538c8",
+    "split_policy": "time_ordered_split",
+    "row_selection_policy": "champion_and_challenger_must_score_identical_dataset_snapshot_and_split_signature",
+    "promotion_policy": "requires_comparison_report_and_governance_approval"
+  },
+  "dataset_snapshot": {
+    "dataset_version": "nyc_open_data_2019_2024_v2_bootstrap",
+    "source_path": "data/processed/nyc_sales_2019_2024_avm_training.csv",
+    "raw_rows": 498666,
+    "transformed_rows": 295457,
+    "train_rows": 236365,
+    "test_rows": 59092,
+    "min_sale_date": "2019-01-01",
+    "max_sale_date": "2024-12-31",
+    "data_snapshot_sha256": "46cc7aa011b6fe11b2eadfe7645375fbb34121d7270d93be42671f40fa152b0e",
+    "split_signature_sha256": "98fb9acb071c5f09dfb7b6182e9370eb7d6907ebfb1c6b9a1a875a9e038c2192",
+    "row_identity_note": "This run is locked to the package dataset snapshot hash and split signature. Row-level ID materialization is still a future enhancement."
+  },
+  "baseline_metrics": {
+    "ppe10": 0.1708691531848643,
+    "mdape": 0.31313148437500005,
+    "r2": 0.3138433722772701
+  },
+  "gates": [
+    {
+      "name": "spec_locked",
+      "status": "pass",
+      "detail": "experiment_spec.json locked with hash 4964b4552e22"
+    },
+    {
+      "name": "dataset_snapshot_available",
+      "status": "pass",
+      "detail": "295,457 transformed rows available"
+    },
+    {
+      "name": "same_rows_comparison_contract",
+      "status": "pass",
+      "detail": "Champion and challenger must share split signature 98fb9acb071c"
+    },
+    {
+      "name": "feature_contract_available",
+      "status": "pass",
+      "detail": "fc_v2_20260504T235549Z_b6538c8"
+    },
+    {
+      "name": "trainer_supported",
+      "status": "pass",
+      "detail": "This model family is wired to the repository trainer."
+    },
+    {
+      "name": "production_release_block",
+      "status": "pass",
+      "detail": "experiment is isolated from production because release gates are blocked"
+    }
+  ],
+  "production_blockers": [
+    {
+      "name": "production_model_evidence",
+      "status": "fail",
+      "detail": "model package contract failed: models/packages/spec_nyc_avm_v2_20260504T235549Z_b6538c8 - [release_decision] release_decision.decision must be approved for production eligibility (release_decision.json)"
+    },
+    {
+      "name": "arena_governance_production",
+      "status": "fail",
+      "detail": "champion alias not set for spec-nyc-avm (Registered model alias champion not found.)"
+    }
+  ],
+  "review": {
+    "required_risk_review": true,
+    "requested_at": "2026-05-05T01:37:03.099Z",
+    "requested_by": "local_dashboard_user",
+    "request_reason": "Smoke worker verification review request.",
+    "decision": "approved",
+    "decided_at": "2026-05-05T01:37:03.543Z",
+    "reviewer": "local_reviewer",
+    "decision_reason": "Approved for controlled smoke worker verification."
+  },
+  "training_job": {
+    "id": "job_exp_20260505T013702_0e9d360f",
+    "experiment_id": "exp_20260505T013702_0e9d360f",
+    "status": "completed",
+    "queued_at": "2026-05-05T01:37:03.995Z",
+    "queued_by": "local_dashboard_user",
+    "reason": "Queue one real trainer-backed smoke verification job.",
+    "worker_module": "src.experiments.worker",
+    "execution_mode": "repo_worker_subprocess",
+    "command": [
+      "python3",
+      "-m",
+      "src.model",
+      "--input-csv",
+      "data/processed/nyc_sales_2019_2024_avm_training.csv",
+      "--model-version",
+      "v2",
+      "--artifact-tag",
+      "exp_20260505T013702_0e9d360f",
+      "--dataset-version",
+      "nyc_open_data_2019_2024_v2_bootstrap",
+      "--optuna-trials",
+      "1",
+      "--shap-sample-size",
+      "250",
+      "--no-mlflow",
+      "--strategy",
+      "global"
+    ],
+    "command_display": "python3 -m src.model --input-csv data/processed/nyc_sales_2019_2024_avm_training.csv --model-version v2 --artifact-tag exp_20260505T013702_0e9d360f --dataset-version nyc_open_data_2019_2024_v2_bootstrap --optuna-trials 1 --shap-sample-size 250 --no-mlflow --strategy global",
+    "cwd": ".",
+    "logs": {
+      "stdout": "reports/experiments/runs/exp_20260505T013702_0e9d360f/training_stdout.log",
+      "stderr": "reports/experiments/runs/exp_20260505T013702_0e9d360f/training_stderr.log"
+    },
+    "training_plan": {
+      "model_family": "Global XGBoost baseline",
+      "trainer_strategy": "global",
+      "router_mode": "segment_only",
+      "optuna_trials": 1,
+      "shap_sample_size": 250,
+      "dataset_version": "nyc_open_data_2019_2024_v2_bootstrap",
+      "artifact_tag": "exp_20260505T013702_0e9d360f"
+    },
+    "input_dataset": {
+      "source_path": "data/processed/nyc_sales_2019_2024_avm_training.csv",
+      "data_snapshot_sha256": "46cc7aa011b6fe11b2eadfe7645375fbb34121d7270d93be42671f40fa152b0e",
+      "split_signature_sha256": "98fb9acb071c5f09dfb7b6182e9370eb7d6907ebfb1c6b9a1a875a9e038c2192"
+    },
+    "output": {
+      "model_package_id": "spec_nyc_avm_v2_20260505T013717Z_b6538c8",
+      "model_package_path": "models/packages/spec_nyc_avm_v2_20260505T013717Z_b6538c8"
+    },
+    "started_at": "2026-05-05T01:37:07Z",
+    "exit_code": 0,
+    "completed_at": "2026-05-05T01:38:06Z"
+  },
+  "comparison": {
+    "status": "passed",
+    "champion_package_id": "spec_nyc_avm_v2_20260504T235549Z_b6538c8",
+    "challenger_package_id": "spec_nyc_avm_v2_20260505T013717Z_b6538c8",
+    "same_dataset_required": true,
+    "dataset_snapshot_sha256": "46cc7aa011b6fe11b2eadfe7645375fbb34121d7270d93be42671f40fa152b0e",
+    "split_signature_sha256": "98fb9acb071c5f09dfb7b6182e9370eb7d6907ebfb1c6b9a1a875a9e038c2192",
+    "blocking_reason": "Comparison passed metric gates; promotion still requires manual champion approval."
+  }
+}

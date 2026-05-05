@@ -1,0 +1,36 @@
+{
+  "command": "precomps_smoke_fixture",
+  "git_sha": "b6538c8",
+  "hyperparameters": {},
+  "model_class": "XGBRegressor",
+  "model_package_id": "spec_nyc_avm_v2_20260505T045612Z_b6538c8",
+  "optimization_objective": "mdape",
+  "package_versions": {
+    "joblib": "1.4.2",
+    "numpy": "1.26.3",
+    "optuna": "4.6.0",
+    "pandas": "2.2.0",
+    "scikit-learn": "1.5.2",
+    "xgboost": "3.2.0"
+  },
+  "preprocessing_steps": [
+    "time_ordered_split",
+    "reset_etl_imputed_model_critical_fields_to_missing",
+    "strict_asof_h3_local_market_features",
+    "temporal_regime_features",
+    "train_fitted_column_transformer_imputation",
+    "one_hot_encoding"
+  ],
+  "python_version": "3.10.6",
+  "random_seed": 42,
+  "run_finished_at_utc": "2026-05-05T04:56:18.805135Z",
+  "run_started_at_utc": "2026-05-05T04:56:12.074647Z",
+  "target": "sale_price",
+  "target_transform": "none",
+  "train_test_split": {
+    "test_rows": 28,
+    "test_size": 0.2,
+    "train_rows": 112,
+    "type": "chronological_holdout"
+  }
+}

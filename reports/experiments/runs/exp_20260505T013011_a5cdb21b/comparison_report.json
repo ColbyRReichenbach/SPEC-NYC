@@ -1,0 +1,16 @@
+{
+  "status": "not_started",
+  "champion_package_id": "spec_nyc_avm_v2_20260504T235549Z_b6538c8",
+  "challenger_package_id": null,
+  "same_dataset_required": true,
+  "dataset_snapshot_sha256": "46cc7aa011b6fe11b2eadfe7645375fbb34121d7270d93be42671f40fa152b0e",
+  "split_signature_sha256": "98fb9acb071c5f09dfb7b6182e9370eb7d6907ebfb1c6b9a1a875a9e038c2192",
+  "blocking_reason": "No challenger training job has completed for this locked spec.",
+  "required_before_promotion": true,
+  "champion_metrics": {
+    "ppe10": 0.1708691531848643,
+    "mdape": 0.31313148437500005,
+    "r2": 0.3138433722772701
+  },
+  "challenger_metrics": null
+}
