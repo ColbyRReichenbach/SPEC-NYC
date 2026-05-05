@@ -837,6 +837,7 @@ def run_etl(
     write_report: bool = False,
     replace_sales: bool = False,
     report_tag: str | None = None,
+    output_csv: Path | None = None,
     data_source: str = "csv",
     datasource_config_path: Path | None = None,
     mapping_yaml: Path | None = None,
@@ -945,6 +946,11 @@ def run_etl(
             logger.info(f"Wrote ETL report: {markdown_path}")
             logger.info(f"Wrote ETL CSV summary: {csv_path}")
 
+        if output_csv is not None:
+            output_csv.parent.mkdir(parents=True, exist_ok=True)
+            df.to_csv(output_csv, index=False)
+            logger.info(f"Wrote transformed training CSV: {output_csv}")
+
         return df
 
     except Exception as e:
@@ -1003,6 +1009,12 @@ if __name__ == "__main__":
         help="Optional artifact tag suffix for ETL report files (e.g., prod, smoke, w6_smoke)",
     )
     parser.add_argument(
+        "--output-csv",
+        type=Path,
+        default=None,
+        help="Optional path for the transformed post-ETL training CSV.",
+    )
+    parser.add_argument(
         "--data-source",
         choices=("csv", "nyc_open_data", "postgres"),
         default="csv",
@@ -1035,6 +1047,7 @@ if __name__ == "__main__":
         write_report=args.write_report,
         replace_sales=args.replace_sales,
         report_tag=args.report_tag,
+        output_csv=args.output_csv,
         data_source=args.data_source,
         datasource_config_path=args.datasource_config_path,
         mapping_yaml=args.mapping_yaml,

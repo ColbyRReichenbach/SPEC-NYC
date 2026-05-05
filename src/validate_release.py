@@ -17,9 +17,11 @@ import numpy as np
 import pandas as pd
 
 from src.mlops.arena import load_policy, proposal_is_expired
+from src.mlops.artifact_contract import validate_model_package
 
 
 DEFAULT_DB_URL = "postgresql://spec:spec_password@localhost:5433/spec_nyc"
+BACKEND_UNIT_TEST_COMMAND = 'python3 -m unittest discover -s tests -p "test_*.py" -v'
 REPORT_DIR = Path("reports/validation")
 LOG_DIR = REPORT_DIR / "logs"
 
@@ -543,66 +545,26 @@ def _production_etl_report_check() -> CheckResult:
     )
 
 
-def _production_model_evidence_check(min_train_rows: int) -> CheckResult:
-    required_files = [
-        Path("models/model_v1.joblib"),
-        Path("models/metrics_v1.json"),
-        Path("reports/model/segment_scorecard_v1.csv"),
-        Path("reports/model/evaluation_predictions_v1.csv"),
-        Path("reports/model/shap_summary_v1.png"),
-        Path("reports/model/shap_waterfall_v1.png"),
-    ]
-    base = check_artifacts(
-        required_paths=required_files,
-        pattern_paths=[],
-        name="production_model_evidence",
-        evidence_type="production",
-    )
-    if not base.passed:
-        return base
-
-    metrics_path = Path("models/metrics_v1.json")
-    try:
-        payload = json.loads(metrics_path.read_text(encoding="utf-8"))
-        metadata = payload.get("metadata", {})
-        train_rows = int(metadata.get("train_rows") or 0)
-        model_version = str(metadata.get("model_version") or "").strip()
-        artifact_tag = str(metadata.get("artifact_tag") or "").strip().lower()
-    except Exception as exc:
+def _production_model_evidence_check(
+    min_train_rows: int,
+    *,
+    model_package_dir: Path = Path("models/packages/current"),
+) -> CheckResult:
+    result = validate_model_package(model_package_dir, min_train_rows=min_train_rows)
+    if not result.passed:
         return CheckResult(
             name="production_model_evidence",
             status="fail",
-            detail=f"failed to parse metrics metadata ({exc})",
-            evidence_type="production",
-        )
-
-    if model_version and model_version != "v1":
-        return CheckResult(
-            name="production_model_evidence",
-            status="fail",
-            detail=f"metrics model_version must be v1 for production evidence (got {model_version})",
-            evidence_type="production",
-        )
-    if artifact_tag and artifact_tag != "prod":
-        return CheckResult(
-            name="production_model_evidence",
-            status="fail",
-            detail=f"metrics artifact_tag must be prod for production evidence (got {artifact_tag})",
-            evidence_type="production",
-        )
-    if train_rows < min_train_rows:
-        return CheckResult(
-            name="production_model_evidence",
-            status="fail",
-            detail=f"train_rows={train_rows} below production threshold {min_train_rows}",
+            detail=result.format().replace("\n", " "),
+            artifacts=result.artifacts,
             evidence_type="production",
         )
 
     return CheckResult(
         name="production_model_evidence",
         status="pass",
-        detail=f"production model metadata validated (train_rows={train_rows}, threshold={min_train_rows})",
-        artifacts=base.artifacts,
+        detail=f"production model package contract validated ({model_package_dir})",
+        artifacts=result.artifacts,
         evidence_type="production",
     )
 
@@ -724,7 +686,7 @@ def _run_smoke_checks(args: argparse.Namespace, *, db_env: Dict[str, str], smoke
     monitoring_reference, monitoring_current = _prepare_monitoring_inputs(smoke_dir, training_input)
 
     checks: List[CheckResult] = []
-    checks.append(run_command("unit_tests", "python3 -m unittest tests.test_etl tests.test_evaluate tests.test_ai_security tests.test_monitoring -v", timeout_sec=300))
+    checks.append(run_command("unit_tests", BACKEND_UNIT_TEST_COMMAND, timeout_sec=300))
     checks.append(run_command("docker_compose_config", "docker compose config -q", timeout_sec=60))
     checks.append(run_command("docker_compose_up_db", "docker compose up -d db", timeout_sec=180))
     checks.append(
@@ -868,13 +830,18 @@ def _run_production_checks(args: argparse.Namespace) -> List[CheckResult]:
     checks.append(
         run_command(
             "unit_tests",
-            "python3 -m unittest tests.test_etl tests.test_evaluate tests.test_ai_security tests.test_monitoring -v",
+            BACKEND_UNIT_TEST_COMMAND,
             timeout_sec=300,
             evidence_type="production",
         )
     )
     checks.append(_production_etl_report_check())
-    checks.append(_production_model_evidence_check(min_train_rows=args.production_min_train_rows))
+    checks.append(
+        _production_model_evidence_check(
+            min_train_rows=args.production_min_train_rows,
+            model_package_dir=args.model_package_dir,
+        )
+    )
     checks.append(
         check_artifacts(
             required_paths=[Path("app.py")],
@@ -967,7 +934,13 @@ def build_parser() -> argparse.ArgumentParser:
         "--production-min-train-rows",
         type=int,
         default=5000,
-        help="Minimum train_rows required in models/metrics_v1.json for production evidence.",
+        help="Minimum train_rows required in a production model package.",
+    )
+    parser.add_argument(
+        "--model-package-dir",
+        type=Path,
+        default=Path("models/packages/current"),
+        help="Directory containing an audit-grade model package.",
     )
     parser.add_argument("--mlflow-tracking-uri", type=str, default=os.getenv("MLFLOW_TRACKING_URI"))
     parser.add_argument("--arena-policy-path", type=Path, default=Path("config/arena_policy.yaml"))

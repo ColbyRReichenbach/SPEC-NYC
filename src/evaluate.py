@@ -10,29 +10,19 @@ from typing import Dict, Iterable
 
 import numpy as np
 import pandas as pd
-from sklearn.metrics import r2_score
+
+from src.evaluate_avm import (
+    SCORECARD_COLUMNS,
+    avm_metric_summary,
+    avm_scorecard,
+    mdape,
+    ppe,
+)
 
 
 def ppe10(y_true: Iterable[float], y_pred: Iterable[float]) -> float:
     """Percent of predictions within +/-10% absolute percentage error."""
-    y_true_arr = np.asarray(y_true, dtype=float)
-    y_pred_arr = np.asarray(y_pred, dtype=float)
-    valid = y_true_arr > 0
-    if valid.sum() == 0:
-        return 0.0
-    ape = np.abs((y_pred_arr[valid] - y_true_arr[valid]) / y_true_arr[valid])
-    return float((ape <= 0.10).mean())
-
-
-def mdape(y_true: Iterable[float], y_pred: Iterable[float]) -> float:
-    """Median absolute percentage error."""
-    y_true_arr = np.asarray(y_true, dtype=float)
-    y_pred_arr = np.asarray(y_pred, dtype=float)
-    valid = y_true_arr > 0
-    if valid.sum() == 0:
-        return float("nan")
-    ape = np.abs((y_pred_arr[valid] - y_true_arr[valid]) / y_true_arr[valid])
-    return float(np.median(ape))
+    return ppe(y_true, y_pred, 0.10)
 
 
 def evaluate_predictions(
@@ -57,13 +47,10 @@ def evaluate_predictions(
     frame[y_true_col] = y_true.loc[valid]
     frame[y_pred_col] = y_pred.loc[valid]
     frame["abs_pct_error"] = np.abs((frame[y_pred_col] - frame[y_true_col]) / frame[y_true_col])
+    frame["signed_pct_error"] = (frame[y_pred_col] - frame[y_true_col]) / frame[y_true_col]
+    frame["valuation_ratio"] = frame[y_pred_col] / frame[y_true_col]
 
-    overall = {
-        "n": int(len(frame)),
-        "ppe10": ppe10(frame[y_true_col], frame[y_pred_col]),
-        "mdape": mdape(frame[y_true_col], frame[y_pred_col]),
-        "r2": float(r2_score(frame[y_true_col], frame[y_pred_col])),
-    }
+    overall = avm_metric_summary(frame, y_true_col=y_true_col, y_pred_col=y_pred_col)
 
     per_segment = _group_metrics(frame, group_col=segment_col, y_true_col=y_true_col, y_pred_col=y_pred_col)
     per_price_tier = _group_metrics(frame, group_col=tier_col, y_true_col=y_true_col, y_pred_col=y_pred_col)
@@ -104,12 +91,7 @@ def _group_metrics(
         if len(group_df) < 2:
             continue
         label = str(group)
-        out[label] = {
-            "n": int(len(group_df)),
-            "ppe10": ppe10(group_df[y_true_col], group_df[y_pred_col]),
-            "mdape": mdape(group_df[y_true_col], group_df[y_pred_col]),
-            "r2": float(r2_score(group_df[y_true_col], group_df[y_pred_col])),
-        }
+        out[label] = avm_metric_summary(group_df, y_true_col=y_true_col, y_pred_col=y_pred_col)
     return out
 
 
@@ -122,23 +104,8 @@ def _group_metrics_table(
     group_type: str,
 ) -> pd.DataFrame:
     if group_col not in frame.columns:
-        return pd.DataFrame(columns=["group_type", "group_name", "n", "ppe10", "mdape", "r2"])
-
-    records = []
-    for group, group_df in frame.groupby(group_col):
-        if len(group_df) < 2:
-            continue
-        records.append(
-            {
-                "group_type": group_type,
-                "group_name": str(group),
-                "n": int(len(group_df)),
-                "ppe10": ppe10(group_df[y_true_col], group_df[y_pred_col]),
-                "mdape": mdape(group_df[y_true_col], group_df[y_pred_col]),
-                "r2": float(r2_score(group_df[y_true_col], group_df[y_pred_col])),
-            }
-        )
-    return pd.DataFrame.from_records(records)
+        return pd.DataFrame(columns=SCORECARD_COLUMNS)
+    return avm_scorecard(frame, group_col=group_col, group_type=group_type, y_true_col=y_true_col, y_pred_col=y_pred_col)
 
 
 def save_metrics(metrics: Dict[str, object], path: Path) -> None:
@@ -220,7 +187,8 @@ def _cli() -> None:
     print(f"Saved metrics JSON: {output_json}")
     print(f"Saved segment scorecard: {segment_scorecard_csv}")
     print(
-        f"Overall => n={metrics['overall']['n']}, PPE10={metrics['overall']['ppe10']:.3f}, "
+        f"Overall => n={metrics['overall']['n']}, PPE5={metrics['overall']['ppe5']:.3f}, "
+        f"PPE10={metrics['overall']['ppe10']:.3f}, PPE20={metrics['overall']['ppe20']:.3f}, "
         f"MdAPE={metrics['overall']['mdape']:.3f}, R2={metrics['overall']['r2']:.3f}"
     )
 

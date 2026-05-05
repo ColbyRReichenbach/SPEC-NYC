@@ -24,7 +24,7 @@ jobs:
 
       - name: Run Python unit tests
         run: |
-          python3 -m unittest tests.test_etl tests.test_evaluate tests.test_ai_security tests.test_monitoring -v
+          python3 -m unittest discover -s tests -p "test_*.py" -v
 
   frontend-contracts:
     runs-on: ubuntu-latest

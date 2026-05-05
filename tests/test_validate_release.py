@@ -1,4 +1,3 @@
-import os
 import tempfile
 import unittest
 from pathlib import Path
@@ -13,6 +12,7 @@ from src.validate_release import (
     check_artifacts,
     evaluate_gates,
 )
+from tests.model_package_fixture import write_minimal_model_package
 
 
 class TestValidateReleaseHelpers(unittest.TestCase):
@@ -96,35 +96,22 @@ class TestValidateReleaseHelpers(unittest.TestCase):
             result = check_artifacts([existing, base / "missing.txt"], pattern_paths=[str(base / "*.csv")])
             self.assertEqual(result.status, "fail")
 
-    def test_production_model_evidence_enforces_train_rows_threshold(self):
+    def test_production_model_evidence_requires_contract_valid_package(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             base = Path(tmpdir)
-            prev_cwd = Path.cwd()
-            try:
-                os.chdir(base)
-                (base / "models").mkdir(parents=True, exist_ok=True)
-                (base / "reports/model").mkdir(parents=True, exist_ok=True)
-                (base / "models/model_v1.joblib").write_text("x", encoding="utf-8")
-                (base / "reports/model/segment_scorecard_v1.csv").write_text("x", encoding="utf-8")
-                (base / "reports/model/evaluation_predictions_v1.csv").write_text("x", encoding="utf-8")
-                (base / "reports/model/shap_summary_v1.png").write_text("x", encoding="utf-8")
-                (base / "reports/model/shap_waterfall_v1.png").write_text("x", encoding="utf-8")
+            missing = _production_model_evidence_check(
+                min_train_rows=5000,
+                model_package_dir=base / "missing_package",
+            )
+            self.assertEqual(missing.status, "fail")
 
-                (base / "models/metrics_v1.json").write_text(
-                    '{"metadata":{"model_version":"v1","artifact_tag":"prod","train_rows":480}}',
-                    encoding="utf-8",
-                )
-                low = _production_model_evidence_check(min_train_rows=5000)
-                self.assertEqual(low.status, "fail")
+            package_dir = write_minimal_model_package(base / "package", train_rows=480)
+            low = _production_model_evidence_check(min_train_rows=5000, model_package_dir=package_dir)
+            self.assertEqual(low.status, "fail")
 
-                (base / "models/metrics_v1.json").write_text(
-                    '{"metadata":{"model_version":"v1","artifact_tag":"prod","train_rows":12000}}',
-                    encoding="utf-8",
-                )
-                high = _production_model_evidence_check(min_train_rows=5000)
-                self.assertEqual(high.status, "pass")
-            finally:
-                os.chdir(prev_cwd)
+            package_dir = write_minimal_model_package(base / "package_valid", train_rows=12000)
+            high = _production_model_evidence_check(min_train_rows=5000, model_package_dir=package_dir)
+            self.assertEqual(high.status, "pass")
 
 
 if __name__ == "__main__":

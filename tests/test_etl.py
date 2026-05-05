@@ -190,6 +190,44 @@ class TestEtlTransforms(unittest.TestCase):
             finally:
                 etl_module.REPORTS_DATA_DIR = original_reports_dir
 
+    def test_run_etl_can_write_transformed_output_csv(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp = Path(tmpdir)
+            input_path = tmp / "raw.csv"
+            output_path = tmp / "processed" / "training.csv"
+            rows = []
+            for idx in range(8):
+                rows.append(
+                    {
+                        "sale_date": f"2025-0{(idx % 8) + 1}-01",
+                        "sale_price": 500000 + idx * 25000,
+                        "bbl": 1000000001 + idx,
+                        "latitude": 40.70 + idx * 0.001,
+                        "longitude": -73.95 - idx * 0.001,
+                        "borough": 1,
+                        "block": 100 + idx,
+                        "lot": 10 + idx,
+                        "address": f"{idx + 1} MAIN ST",
+                        "apartment_number": "",
+                        "building_class_category": "01 ONE FAMILY DWELLINGS",
+                        "building_class": "A1",
+                        "neighborhood": "ALPHA",
+                        "gross_square_feet": 1000 + idx * 20,
+                        "land_square_feet": 1500 + idx * 20,
+                        "year_built": 1950 + idx,
+                        "residential_units": 1,
+                        "total_units": 1,
+                    }
+                )
+            pd.DataFrame(rows).to_csv(input_path, index=False)
+
+            out = etl_module.run_etl(input_path=input_path, dry_run=True, output_csv=output_path)
+            self.assertTrue(output_path.exists())
+            written = pd.read_csv(output_path)
+            self.assertEqual(len(written), len(out))
+            self.assertIn("price_tier_proxy", written.columns)
+            self.assertIn("h3_index", written.columns)
+
     def test_enrich_sales_history_derivations(self):
         df = pd.DataFrame(
             [

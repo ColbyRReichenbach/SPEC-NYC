@@ -6,6 +6,7 @@ import argparse
 import json
 import logging
 import re
+import sys
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -25,6 +26,7 @@ from config.settings import MODEL_CONFIG, MODELS_DIR
 from src.database import engine
 from src.evaluate import build_segment_scorecard, evaluate_predictions, mdape, save_metrics
 from src.explain import generate_shap_artifacts
+from src.features.comps import COMP_FEATURES, add_asof_comps_features
 from src.inference import (
     build_route_keys,
     predict_dataframe,
@@ -32,6 +34,19 @@ from src.inference import (
     validate_router_columns_for_inference,
 )
 from src.monitoring.drift import calculate_ks, calculate_psi
+from src.mlops.package_builder import write_candidate_model_package
+from src.pre_comps import (
+    LOCAL_MARKET_FEATURES,
+    add_asof_local_market_features,
+    add_sale_validity_labels,
+    build_split_manifest_frame,
+    feature_availability_manifest,
+    filter_training_eligible_sales,
+    restore_model_critical_missingness,
+    sale_validity_summary,
+    split_manifest_summary,
+    stable_row_ids,
+)
 from src.mlops.track_run import get_git_sha, log_run
 from src.price_tier_proxy import assign_price_tier_proxy
 
@@ -51,7 +66,10 @@ NUMERIC_FEATURES = [
     "residential_units",
     "total_units",
     "distance_to_center_km",
-    "h3_price_lag",
+    "h3_prior_sale_count",
+    "h3_prior_median_price",
+    "h3_prior_median_ppsf",
+    *COMP_FEATURES,
     "days_since_2019_start",
     "month_sin",
     "month_cos",
@@ -98,6 +116,8 @@ class TrainConfig:
     enable_mlflow: bool = True
     dataset_version: str | None = None
     tracking_uri: str | None = None
+    command: str | None = None
+    data_source_uri: str = "programmatic_dataframe"
 
 
 def _normalize_artifact_tag(tag: str | None) -> str:
@@ -189,6 +209,8 @@ def prepare_training_frame(df: pd.DataFrame) -> pd.DataFrame:
     frame[TARGET_COL] = pd.to_numeric(frame[TARGET_COL], errors="coerce")
     frame = frame.dropna(subset=[DATE_COL, TARGET_COL, "h3_index"])
     frame = frame[frame[TARGET_COL] >= 10_000].copy()
+    frame = add_sale_validity_labels(frame)
+    frame = filter_training_eligible_sales(frame)
     frame = frame.sort_values(DATE_COL).reset_index(drop=True)
     if len(frame) < 50:
         raise ValueError("Need at least 50 rows after filtering for stable baseline training.")
@@ -208,19 +230,9 @@ def time_split(frame: pd.DataFrame, test_size: float) -> Tuple[pd.DataFrame, pd.
 
 
 def add_h3_price_lag(train_df: pd.DataFrame, test_df: pd.DataFrame) -> Tuple[pd.DataFrame, pd.DataFrame]:
-    """
-    Compute h3 price lag from training data only and map into train/test.
-    This is a leakage-safe proxy until neighborhood-neighbor aggregation is added.
-    """
-    train_df = train_df.copy()
-    test_df = test_df.copy()
-
-    h3_median = train_df.groupby("h3_index")[TARGET_COL].median()
-    global_median = float(train_df[TARGET_COL].median())
-
-    train_df["h3_price_lag"] = train_df["h3_index"].map(h3_median).fillna(global_median)
-    test_df["h3_price_lag"] = test_df["h3_index"].map(h3_median).fillna(global_median)
-    return train_df, test_df
+    """Backward-compatible wrapper for strict as-of H3 local market features."""
+    result = add_asof_local_market_features(train_df, test_df)
+    return result.train_df, result.test_df
 
 
 def add_temporal_regime_features(train_df: pd.DataFrame, test_df: pd.DataFrame) -> Tuple[pd.DataFrame, pd.DataFrame]:
@@ -256,14 +268,28 @@ def build_temporal_scorecard(
     period_freq: str = "Q",
 ) -> pd.DataFrame:
     """Compute time-slice diagnostics over chronological periods."""
+    columns = [
+        "period",
+        "n",
+        "ppe5",
+        "ppe10",
+        "ppe20",
+        "mdape",
+        "mape",
+        "r2",
+        "median_valuation_ratio",
+        "coefficient_of_dispersion",
+        "price_related_differential",
+        "price_related_bias",
+    ]
     if eval_df.empty or DATE_COL not in eval_df.columns:
-        return pd.DataFrame(columns=["period", "n", "ppe10", "mdape", "r2"])
+        return pd.DataFrame(columns=columns)
 
     frame = eval_df.copy()
     frame[DATE_COL] = pd.to_datetime(frame[DATE_COL], errors="coerce")
     frame = frame.dropna(subset=[DATE_COL, TARGET_COL, "predicted_price"])
     if frame.empty:
-        return pd.DataFrame(columns=["period", "n", "ppe10", "mdape", "r2"])
+        return pd.DataFrame(columns=columns)
 
     frame["period"] = frame[DATE_COL].dt.to_period(period_freq).astype(str)
     rows = []
@@ -273,12 +299,24 @@ def build_temporal_scorecard(
             {
                 "period": period,
                 "n": int(metrics["n"]),
+                "ppe5": _scorecard_metric(metrics, "ppe5"),
                 "ppe10": float(metrics["ppe10"]),
+                "ppe20": _scorecard_metric(metrics, "ppe20"),
                 "mdape": float(metrics["mdape"]),
-                "r2": float(metrics["r2"]),
+                "mape": _scorecard_metric(metrics, "mape"),
+                "r2": _scorecard_metric(metrics, "r2"),
+                "median_valuation_ratio": _scorecard_metric(metrics, "median_valuation_ratio"),
+                "coefficient_of_dispersion": _scorecard_metric(metrics, "coefficient_of_dispersion"),
+                "price_related_differential": _scorecard_metric(metrics, "price_related_differential"),
+                "price_related_bias": _scorecard_metric(metrics, "price_related_bias"),
             }
         )
     return pd.DataFrame(rows).sort_values("period").reset_index(drop=True)
+
+
+def _scorecard_metric(metrics: dict, key: str) -> float:
+    value = metrics.get(key)
+    return float(value) if value is not None else float("nan")
 
 
 def validate_training_feature_contract(
@@ -460,6 +498,54 @@ def build_feature_drift_by_segment_time(
     return out
 
 
+def build_high_error_review_sample(
+    eval_df: pd.DataFrame,
+    *,
+    feature_columns: list[str],
+    max_rows: int = 50,
+) -> pd.DataFrame:
+    """Create an auditable high-error sample with model and comp evidence fields."""
+    columns = [
+        "row_id",
+        "sale_date",
+        "property_id",
+        "borough",
+        "neighborhood",
+        "property_segment",
+        "sale_price",
+        "predicted_price",
+        "prediction_error",
+        "abs_pct_error",
+        "model_route",
+        "comp_count",
+        "comp_weighted_estimate",
+        "comp_median_ppsf",
+        "comp_price_dispersion",
+        "comp_nearest_distance_km",
+        "comp_median_recency_days",
+        "review_status",
+        "reviewer",
+        "risk_notes",
+        "action_required",
+    ]
+    if eval_df.empty:
+        return pd.DataFrame(columns=columns)
+
+    frame = eval_df.copy()
+    if "row_id" not in frame.columns:
+        frame["row_id"] = stable_row_ids(frame)
+    frame["abs_pct_error"] = pd.to_numeric(frame.get("abs_pct_error"), errors="coerce")
+    frame = frame.sort_values("abs_pct_error", ascending=False, na_position="last").head(max_rows).copy()
+    frame["review_status"] = "pending"
+    frame["reviewer"] = ""
+    frame["risk_notes"] = ""
+    frame["action_required"] = ""
+    for column in columns:
+        if column not in frame.columns:
+            frame[column] = np.nan if column in feature_columns or column.startswith("comp_") else ""
+    return frame[columns].reset_index(drop=True)
+
+
 def _make_one_hot_encoder() -> OneHotEncoder:
     try:
         return OneHotEncoder(handle_unknown="ignore")
@@ -538,6 +624,13 @@ def tune_hyperparameters(train_df: pd.DataFrame, random_state: int, n_trials: in
         logger.warning("Validation slice too small for reliable tuning; skipping Optuna.")
         return {}
 
+    asof_result = add_asof_local_market_features(fit_df, valid_df)
+    fit_df = asof_result.train_df
+    valid_df = asof_result.test_df
+    comps_result = add_asof_comps_features(fit_df, valid_df, persist_selected_split="none")
+    fit_df = comps_result.train_df
+    valid_df = comps_result.test_df
+
     logger.info("Starting Optuna tuning with %s trials", n_trials)
     study = optuna.create_study(direction="minimize")
     study.optimize(lambda trial: _objective(trial, fit_df, valid_df, random_state), n_trials=n_trials)
@@ -599,6 +692,9 @@ def _train_segmented_router_models(
 
 def train_model(df: pd.DataFrame, config: TrainConfig) -> dict:
     """Train baseline model, evaluate, and persist W2 artifacts."""
+    run_started = datetime.utcnow()
+    run_started_at_utc = f"{run_started.isoformat()}Z"
+    git_sha = get_git_sha()
     strategy = str(config.model_strategy).strip().lower()
     if strategy not in MODEL_STRATEGIES:
         raise ValueError(f"Unsupported model strategy '{config.model_strategy}'. Expected one of {sorted(MODEL_STRATEGIES)}")
@@ -609,8 +705,12 @@ def train_model(df: pd.DataFrame, config: TrainConfig) -> dict:
         raise ValueError("min_segment_rows must be >= 1")
 
     frame = prepare_training_frame(df)
+    dataset_version = config.dataset_version or (
+        f"rows_{len(frame)}_date_{frame[DATE_COL].min().date()}_{frame[DATE_COL].max().date()}"
+    )
     train_df, test_df = time_split(frame, config.test_size)
-    train_df, test_df = add_h3_price_lag(train_df, test_df)
+    train_df, train_imputation_report = restore_model_critical_missingness(train_df)
+    test_df, test_imputation_report = restore_model_critical_missingness(test_df)
     train_df, test_df = add_temporal_regime_features(train_df, test_df)
     price_tier_proxy_bins: dict | None = None
     router_columns = _router_columns_for_mode(router_mode) if strategy == "segmented_router" else []
@@ -630,14 +730,20 @@ def train_model(df: pd.DataFrame, config: TrainConfig) -> dict:
         )
 
     feature_columns = NUMERIC_FEATURES + CATEGORICAL_FEATURES
+    best_params = tune_hyperparameters(train_df, config.random_state, config.optuna_trials)
+
+    asof_result = add_asof_local_market_features(train_df, test_df)
+    train_df = asof_result.train_df
+    test_df = asof_result.test_df
+    comps_result = add_asof_comps_features(train_df, test_df, persist_selected_split="test")
+    train_df = comps_result.train_df
+    test_df = comps_result.test_df
     validate_training_feature_contract(
         train_df,
         test_df,
         feature_columns=feature_columns,
         router_columns=router_columns,
     )
-
-    best_params = tune_hyperparameters(train_df, config.random_state, config.optuna_trials)
 
     logger.info("Training strategy '%s' on %s rows", strategy, len(train_df))
     if strategy == "segmented_router":
@@ -685,6 +791,35 @@ def train_model(df: pd.DataFrame, config: TrainConfig) -> dict:
 
     artifact_tag = _normalize_artifact_tag(config.artifact_tag)
     artifact_stem = _artifact_stem(config.model_version, artifact_tag)
+    package_timestamp = run_started.strftime("%Y%m%dT%H%M%SZ")
+    git_short = re.sub(r"[^a-zA-Z0-9]", "", git_sha)[:12] or "nogit"
+    model_package_id = f"spec_nyc_avm_{config.model_version}_{package_timestamp}_{git_short}"
+    feature_contract_version = f"fc_{config.model_version}_{package_timestamp}_{git_short}"
+    split_manifest = build_split_manifest_frame(train_df, test_df)
+    split_summary = split_manifest_summary(split_manifest)
+    pre_comps_manifest = {
+        "model_package_id": model_package_id,
+        "status": "pre_comps_ready",
+        "sale_validity": sale_validity_summary(pd.concat([train_df, test_df], ignore_index=True)),
+        "model_critical_imputation": {
+            "train": train_imputation_report,
+            "test": test_imputation_report,
+        },
+        "local_market_features": asof_result.manifest,
+        "comparable_sales_features": comps_result.manifest,
+        "feature_availability": feature_availability_manifest(feature_columns),
+        "split_manifest": split_summary,
+        "blocked_target_derived_fields": [
+            "sale_price",
+            "price_tier",
+            "price_per_sqft",
+            "price_change_pct",
+            "previous_sale_price",
+            "previous_sale_date",
+            "days_since_last_sale",
+            "is_latest_sale",
+        ],
+    }
 
     metrics = evaluate_predictions(eval_df)
     segment_scores = [v["ppe10"] for v in metrics.get("per_segment", {}).values() if isinstance(v, dict) and "ppe10" in v]
@@ -692,13 +827,18 @@ def train_model(df: pd.DataFrame, config: TrainConfig) -> dict:
     segment_variance_flag_v2 = bool(segment_ppe10_variance > 0.15)
     metrics["metadata"] = {
         "model_version": config.model_version,
+        "model_package_id": model_package_id,
         "artifact_tag": artifact_tag,
         "trained_at_utc": datetime.utcnow().isoformat(),
         "train_rows": int(len(train_df)),
         "test_rows": int(len(test_df)),
+        "dataset_version": dataset_version,
+        "feature_contract_version": feature_contract_version,
+        "target": TARGET_COL,
+        "target_transform": "none",
         "model_strategy": strategy,
         "router_mode": router_mode,
-        "router_columns": router_columns or ["property_segment"],
+        "router_columns": router_columns,
         "min_segment_rows": int(config.min_segment_rows),
         "segment_model_count": int(len(segment_pipelines)),
         "feature_columns": feature_columns,
@@ -706,8 +846,12 @@ def train_model(df: pd.DataFrame, config: TrainConfig) -> dict:
         "best_params": best_params,
         "segment_ppe10_variance": segment_ppe10_variance,
         "segment_variance_flag_v2": segment_variance_flag_v2,
-        "dataset_version": config.dataset_version,
         "price_tier_proxy_bins_version": (price_tier_proxy_bins or {}).get("version"),
+        "pre_comps_readiness_status": pre_comps_manifest["status"],
+        "split_manifest": split_summary,
+        "sale_validity": pre_comps_manifest["sale_validity"],
+        "local_market_features": asof_result.manifest,
+        "comparable_sales_features": comps_result.manifest,
     }
     if segment_variance_flag_v2:
         logger.warning("Segment PPE10 variance %.3f exceeds 0.15. Flagging V2 segment-specific models.", segment_ppe10_variance)
@@ -723,6 +867,12 @@ def train_model(df: pd.DataFrame, config: TrainConfig) -> dict:
     temporal_scorecard_path = report_dir / f"temporal_scorecard_{artifact_stem}.csv"
     missingness_path = report_dir / f"feature_missingness_{artifact_stem}.csv"
     drift_path = report_dir / f"feature_drift_segment_time_{artifact_stem}.csv"
+    pre_comps_manifest_path = report_dir / f"pre_comps_readiness_{artifact_stem}.json"
+    split_manifest_path = report_dir / f"split_manifest_{artifact_stem}.csv"
+    comps_manifest_path = report_dir / f"comps_manifest_{artifact_stem}.json"
+    selected_comps_path = report_dir / f"selected_comps_{artifact_stem}.csv"
+    high_error_review_path = report_dir / f"high_error_review_sample_{artifact_stem}.csv"
+    high_error_comps_path = report_dir / f"high_error_selected_comps_{artifact_stem}.csv"
 
     artifact = {
         "pipeline": fallback_pipeline,  # backward compatibility with legacy readers
@@ -737,6 +887,8 @@ def train_model(df: pd.DataFrame, config: TrainConfig) -> dict:
         "numeric_features": NUMERIC_FEATURES,
         "categorical_features": CATEGORICAL_FEATURES,
         "price_tier_proxy_bins": price_tier_proxy_bins,
+        "pre_comps_readiness": pre_comps_manifest,
+        "comparable_sales_features": comps_result.manifest,
         "model_version": config.model_version,
         "artifact_tag": artifact_tag,
         "trained_at_utc": datetime.utcnow().isoformat(),
@@ -746,6 +898,10 @@ def train_model(df: pd.DataFrame, config: TrainConfig) -> dict:
     build_segment_scorecard(eval_df).to_csv(scorecard_path, index=False)
     temporal_scorecard = build_temporal_scorecard(eval_df)
     temporal_scorecard.to_csv(temporal_scorecard_path, index=False)
+    pre_comps_manifest_path.write_text(json.dumps(pre_comps_manifest, indent=2, sort_keys=True), encoding="utf-8")
+    split_manifest.to_csv(split_manifest_path, index=False)
+    comps_manifest_path.write_text(json.dumps(comps_result.manifest, indent=2, sort_keys=True), encoding="utf-8")
+    comps_result.selected_comps.to_csv(selected_comps_path, index=False)
     feature_missingness = build_feature_missingness_by_segment_time(
         eval_df,
         feature_columns=feature_columns,
@@ -757,11 +913,21 @@ def train_model(df: pd.DataFrame, config: TrainConfig) -> dict:
         feature_columns=feature_columns,
     )
     feature_drift.to_csv(drift_path, index=False)
+    eval_df["row_id"] = stable_row_ids(eval_df)
+    high_error_review = build_high_error_review_sample(eval_df, feature_columns=feature_columns)
+    high_error_review.to_csv(high_error_review_path, index=False)
+    high_error_ids = set(high_error_review["row_id"].astype(str).tolist()) if "row_id" in high_error_review.columns else set()
+    high_error_comps = comps_result.selected_comps[
+        comps_result.selected_comps["valuation_row_id"].astype(str).isin(high_error_ids)
+    ].copy() if high_error_ids and not comps_result.selected_comps.empty else comps_result.selected_comps.iloc[0:0].copy()
+    high_error_comps.to_csv(high_error_comps_path, index=False)
     eval_df.to_csv(predictions_path, index=False)
     metrics["metadata"]["feature_missingness_rows"] = int(len(feature_missingness))
     metrics["metadata"]["feature_drift_rows"] = int(len(feature_drift))
     metrics["metadata"]["feature_drift_alerts"] = int((feature_drift["status"] == "alert").sum()) if not feature_drift.empty else 0
     metrics["metadata"]["feature_drift_warnings"] = int((feature_drift["status"] == "warn").sum()) if not feature_drift.empty else 0
+    metrics["metadata"]["selected_comps_rows"] = int(len(comps_result.selected_comps))
+    metrics["metadata"]["high_error_review_rows"] = int(len(high_error_review))
     save_metrics(metrics, metrics_path)
 
     if not temporal_scorecard.empty:
@@ -785,6 +951,12 @@ def train_model(df: pd.DataFrame, config: TrainConfig) -> dict:
     logger.info("Saved metrics artifact: %s", metrics_path)
     logger.info("Saved segment scorecard: %s", scorecard_path)
     logger.info("Saved temporal scorecard: %s", temporal_scorecard_path)
+    logger.info("Saved pre-comps readiness manifest: %s", pre_comps_manifest_path)
+    logger.info("Saved split row manifest: %s", split_manifest_path)
+    logger.info("Saved comps manifest: %s", comps_manifest_path)
+    logger.info("Saved selected comps evidence: %s", selected_comps_path)
+    logger.info("Saved high-error review sample: %s", high_error_review_path)
+    logger.info("Saved high-error selected comps evidence: %s", high_error_comps_path)
     logger.info("Saved feature missingness diagnostics: %s", missingness_path)
     logger.info("Saved feature drift diagnostics: %s", drift_path)
     logger.info("Saved evaluation predictions: %s", predictions_path)
@@ -801,11 +973,68 @@ def train_model(df: pd.DataFrame, config: TrainConfig) -> dict:
         )
         logger.info("Generated SHAP artifacts: %s", shap_artifacts)
 
+    run_finished_at_utc = f"{datetime.utcnow().isoformat()}Z"
+    package_result = write_candidate_model_package(
+        package_dir=Path("models/packages") / model_package_id,
+        package_id=model_package_id,
+        model_artifact_path=model_path,
+        slice_scorecard_path=scorecard_path,
+        temporal_scorecard_path=temporal_scorecard_path,
+        feature_drift_path=drift_path,
+        train_df=train_df,
+        test_df=test_df,
+        raw_row_count=int(len(df)),
+        data_sources=[
+            {
+                "name": "training_source",
+                "uri": config.data_source_uri,
+                "extracted_at_utc": run_started_at_utc,
+                "row_count": int(len(df)),
+            }
+        ],
+        metrics=metrics,
+        feature_columns=feature_columns,
+        router_columns=router_columns,
+        command=config.command or " ".join(sys.argv),
+        git_sha=git_sha,
+        model_version=config.model_version,
+        dataset_version=dataset_version,
+        feature_contract_version=feature_contract_version,
+        model_class="XGBRegressor",
+        hyperparameters=best_params,
+        random_seed=config.random_state,
+        train_test_split={
+            "type": "chronological_holdout",
+            "test_size": config.test_size,
+            "train_rows": int(len(train_df)),
+            "test_rows": int(len(test_df)),
+        },
+        target=TARGET_COL,
+        target_transform="none",
+        preprocessing_steps=[
+            "time_ordered_split",
+            "reset_etl_imputed_model_critical_fields_to_missing",
+            "strict_asof_h3_local_market_features",
+            "strict_asof_comparable_sales_features",
+            "temporal_regime_features",
+            "train_fitted_column_transformer_imputation",
+            "one_hot_encoding",
+        ],
+        optimization_objective="mdape",
+        run_started_at_utc=run_started_at_utc,
+        run_finished_at_utc=run_finished_at_utc,
+        shap_artifacts=shap_artifacts,
+        pre_comps_manifest_path=pre_comps_manifest_path,
+        split_manifest_path=split_manifest_path,
+        comps_manifest_path=comps_manifest_path,
+        selected_comps_path=selected_comps_path,
+        high_error_review_path=high_error_review_path,
+        high_error_comps_path=high_error_comps_path,
+    )
+    logger.info("Saved candidate model package: %s", package_result.package_dir)
+
     mlflow_result = {}
     if config.enable_mlflow:
-        inferred_dataset_version = config.dataset_version or (
-            f"rows_{len(frame)}_date_{frame[DATE_COL].min().date()}_{frame[DATE_COL].max().date()}"
-        )
         try:
             mlflow_result = log_run(
                 metrics_json=metrics_path,
@@ -814,8 +1043,8 @@ def train_model(df: pd.DataFrame, config: TrainConfig) -> dict:
                 predictions_csv=predictions_path,
                 experiment_name="spec-nyc-avm",
                 run_name=f"train-{artifact_stem}",
-                dataset_version=inferred_dataset_version,
-                git_sha=get_git_sha(),
+                dataset_version=dataset_version,
+                git_sha=git_sha,
                 tracking_uri=config.tracking_uri,
             )
             logger.info("Tracked MLflow run: %s", mlflow_result)
@@ -830,7 +1059,15 @@ def train_model(df: pd.DataFrame, config: TrainConfig) -> dict:
         "temporal_scorecard_path": str(temporal_scorecard_path),
         "missingness_path": str(missingness_path),
         "drift_path": str(drift_path),
+        "pre_comps_manifest_path": str(pre_comps_manifest_path),
+        "split_manifest_path": str(split_manifest_path),
+        "comps_manifest_path": str(comps_manifest_path),
+        "selected_comps_path": str(selected_comps_path),
+        "high_error_review_path": str(high_error_review_path),
+        "high_error_comps_path": str(high_error_comps_path),
         "artifact_tag": artifact_tag,
+        "model_package_id": model_package_id,
+        "model_package_dir": str(package_result.package_dir),
         "metrics": metrics,
         "shap_artifacts": shap_artifacts,
         "mlflow": mlflow_result,
@@ -898,6 +1135,8 @@ def _cli() -> None:
         enable_mlflow=not args.no_mlflow,
         dataset_version=args.dataset_version,
         tracking_uri=args.tracking_uri,
+        command=" ".join(sys.argv),
+        data_source_uri=str(args.input_csv) if args.input_csv is not None else "postgresql:sales",
     )
 
     df = load_training_data(input_csv=args.input_csv, limit=args.limit)
@@ -909,6 +1148,7 @@ def _cli() -> None:
             "metrics": result["metrics_path"],
             "segment_scorecard": result["scorecard_path"],
             "predictions": result["predictions_path"],
+            "model_package": result["model_package_dir"],
         },
         "strategy": args.strategy,
         "router_mode": args.router_mode,
